@@ -14,7 +14,7 @@ extraction) and ``## Agent Instructions`` to ``agent_custom_instructions``
 policy lives in the repo, travels with it, and is shared by the whole team.
 
 The hook writers call :func:`load_instructions` and merge the result into their
-``/v3/memories/add`` body. Returns only the keys that are actually set, so a
+``/v1/agent/memory/add`` body. Returns only the keys that are actually set, so a
 project with no policy adds nothing.
 """
 

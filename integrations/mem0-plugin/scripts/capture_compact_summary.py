@@ -25,7 +25,7 @@ import urllib.request
 from datetime import date, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _identity import resolve_api_key, resolve_user_id
+from _identity import resolve_api_key, resolve_api_url, resolve_user_id
 from _instructions import load_instructions
 from _project import resolve_branch, resolve_project_id
 
@@ -45,7 +45,7 @@ if os.environ.get("MEM0_DEBUG"):
     except OSError:
         pass
 
-API_URL = "https://api.mem0.ai"
+API_URL = resolve_api_url()
 MAX_TAIL_LINES = 2000
 MAX_SUMMARY_CHARS = 50000
 # Compact summaries describe a single session's state -- stale after a quarter.
@@ -121,11 +121,11 @@ def store_summary(api_key: str, summary: str, user_id: str, session_id: str, pro
 
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
-        f"{API_URL}/v3/memories/add/",
+        f"{API_URL}/v1/agent/memory/add",
         data=data,
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Token {api_key}",
+            "X-API-Key": api_key,
         },
         method="POST",
     )

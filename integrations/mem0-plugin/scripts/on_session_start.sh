@@ -35,6 +35,8 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   if [ -n "${MEM0_API_KEY:-}" ]; then
     echo "export MEM0_API_KEY=\"$MEM0_API_KEY\"" >> "$CLAUDE_ENV_FILE"
   fi
+  echo "export MEM0_BASE_URL=\"${MEM0_BASE_URL}\"" >> "$CLAUDE_ENV_FILE"
+  echo "export MEM0_MCP_URL=\"${MEM0_MCP_URL}\"" >> "$CLAUDE_ENV_FILE"
 fi
 
 if [ -z "${MEM0_API_KEY:-}" ]; then
@@ -54,11 +56,13 @@ Mem0 — Setup Required | user=${_UID} | project=${_PID} | branch=${_BR} | auth=
 
 MEM0_API_KEY is not set. To configure:
 - **Reinstall the plugin**: Uninstall and reinstall — Claude Code will prompt for your API key during setup (stored securely in keychain)
-- **Desktop app**: Click the environment dropdown next to the prompt box → hover over **Local** → click the **gear icon** → add \`MEM0_API_KEY=m0-...\`
-- **CLI**: Add \`export MEM0_API_KEY=m0-...\` to your shell profile (~/.zshrc or ~/.bashrc)
-- Get a key at https://app.mem0.ai/dashboard/api-keys
+- **Desktop app**: Click the environment dropdown next to the prompt box → hover over **Local** → click the **gear icon** → add \`MEM0_API_KEY=sk-...\`
+- **CLI**: Add \`export MEM0_API_KEY=sk-...\` to your shell profile (~/.zshrc or ~/.bashrc)
+- Get a local API key (\`sk-...\`) from your agent-memory site
 
-Then invoke the \`mem0:onboard\` skill to complete setup.
+Optional overrides:
+- \`MEM0_BASE_URL\` (default \`http://localhost:18100\`) — memory REST API
+- \`MEM0_MCP_URL\` (default \`http://localhost:18101/v1/agent/mcp/memory/mcp\`) — MCP endpoint
 BANNER
   exit 0
 fi
@@ -74,31 +78,24 @@ if command -v python3 >/dev/null 2>&1; then
   MEM0_COUNT=$(python3 -c "
 import json, os, urllib.request, urllib.error
 api_key = os.environ.get('MEM0_API_KEY', '')
-user_id = os.environ.get('MEM0_RESOLVED_USER_ID', 'default')
-app_id = os.environ.get('MEM0_PROJECT_ID', '')
-global_search = os.environ.get('MEM0_GLOBAL_SEARCH', 'false') == 'true'
+base_url = os.environ['MEM0_BASE_URL'].rstrip('/')
 
-def get_count(filters):
-    body = json.dumps({'filters': filters}).encode()
+def get_count():
     req = urllib.request.Request(
-        'https://api.mem0.ai/v3/memories/?page=1&page_size=1',
-        headers={'Authorization': f'Token {api_key}', 'Content-Type': 'application/json'},
-        data=body, method='POST',
+        f'{base_url}/v1/agent/memory?page=1&page_size=1',
+        headers={'X-API-Key': api_key},
+        method='GET',
     )
     with urllib.request.urlopen(req, timeout=5) as r:
         data = json.loads(r.read())
-        if isinstance(data, dict) and 'count' in data:
-            return data['count']
+        if isinstance(data, dict) and 'total' in data:
+            return data['total']
         if isinstance(data, list):
             return len(data)
     return 0
 
 try:
-    if global_search:
-        filters = {'OR': [{'user_id': '*'}]}
-    else:
-        filters = {'AND': [{'user_id': user_id}, {'app_id': app_id}]}
-    total = get_count(filters)
+    total = get_count()
     print(total)
 except Exception:
     print('?')
@@ -113,12 +110,10 @@ _GS="${MEM0_GLOBAL_SEARCH:-false}"
 
 if [ "$_GS" = "true" ]; then
   _SCOPE_LABEL="scope=global"
-  _SCOPE_INSTR="Global search is ON — searches return all memories across all users and projects. Writes still use user_id: \`${_UID}\`, app_id: \`${_PID}\`."
+  _SCOPE_INSTR="Global search is ON — searches return all memories across all users and projects."
 else
   _SCOPE_LABEL="project=${_PID}"
-  _SCOPE_INSTR="Always include \`user_id\` + \`app_id\` in every \`search_memories\` filter and \`add_memory\` call:
-- user_id: \`${_UID}\`
-- app_id: \`${_PID}\` (project scope — passed as top-level \`app_id\`, NOT in metadata)"
+  _SCOPE_INSTR="Identity (user/app) is resolved automatically from your API key — no need to pass user_id or app_id."
 fi
 
 cat <<BANNER
@@ -161,7 +156,7 @@ fi
 
 if [ "$SOURCE" = "startup" ]; then
   if [ "$MEM0_COUNT" = "0" ]; then
-    echo "New project with 0 memories. Invoke the mem0:onboard skill to import project files. Coding categories install automatically in the background."
+    echo "New project with 0 memories. Project files (CLAUDE.md, AGENTS.md) import automatically in the background."
   else
     echo "Search mem0 for recent decisions and task learnings before responding. Run 2 parallel searches: one for decision type, one for task_learning type."
 

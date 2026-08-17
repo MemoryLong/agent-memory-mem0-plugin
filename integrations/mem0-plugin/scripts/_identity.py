@@ -75,6 +75,12 @@ def resolve_user_id() -> str:
     return os.environ.get("USER") or "default"
 
 
+def resolve_api_url() -> str:
+    """Resolve the memory backend REST API base URL (trailing slash stripped)."""
+    base = os.environ.get("MEM0_BASE_URL", "").strip() or "http://localhost:18100"
+    return base.rstrip("/")
+
+
 def resolve_config() -> dict:
     """Resolve settings from ~/.mem0/settings.json (primary) with env var overrides."""
     try:

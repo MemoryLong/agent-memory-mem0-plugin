@@ -1,6 +1,6 @@
 """Shared mem0 search API helper.
 
-Wraps POST /v3/memories/search/ into a single function call.
+Wraps POST /v1/agent/memory/search into a single function call.
 All pre-fetch hooks use this instead of duplicating urllib boilerplate.
 """
 
@@ -10,12 +10,15 @@ import json
 import os
 import urllib.request
 
-SEARCH_URL = "https://api.mem0.ai/v3/memories/search/"
+from _identity import resolve_api_url
+
+API_BASE = resolve_api_url()
+SEARCH_URL = f"{API_BASE}/v1/agent/memory/search"
 SEARCH_TIMEOUT = 5
 
 
 def should_rerank() -> bool:
-    """Whether auto-injection searches should request Platform reranking.
+    """Whether auto-injection searches should request reranking.
 
     The REST search endpoint does not rerank when ``rerank`` is omitted, so
     auto-injected context is ordered by raw vector similarity and the single
@@ -37,7 +40,7 @@ def _do_search(api_key: str, payload: dict) -> list[dict]:
     req = urllib.request.Request(
         SEARCH_URL,
         data=body,
-        headers={"Authorization": f"Token {api_key}", "Content-Type": "application/json"},
+        headers={"X-API-Key": api_key, "Content-Type": "application/json"},
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=SEARCH_TIMEOUT) as r:
@@ -47,8 +50,6 @@ def _do_search(api_key: str, payload: dict) -> list[dict]:
 
 def search_memories(
     api_key: str,
-    user_id: str,
-    project_id: str,
     query: str,
     metadata_type: str | None = None,
     metadata_filters: dict | None = None,
@@ -61,24 +62,27 @@ def search_memories(
     if not api_key:
         return []
 
-    if global_search:
-        filters: dict = {"OR": [{"user_id": "*"}]}
-    else:
-        base_clauses: list[dict] = [{"user_id": user_id}, {"app_id": project_id}]
+    # Local backend uses flat metadata filters (no AND/OR). Identity
+    # (user_id/app_id) is resolved from X-API-Key; scope maps global vs project.
+    filters: dict = {}
+    if not global_search:
         if metadata_type:
-            base_clauses.append({"metadata": {"type": metadata_type}})
+            filters["type"] = metadata_type
         if metadata_filters:
-            for key, value in metadata_filters.items():
-                base_clauses.append({"metadata": {key: value}})
-        filters = {"AND": base_clauses}
+            filters.update(metadata_filters)
 
-    base_payload: dict = {"query": query, "top_k": top_k, "threshold": threshold}
+    base_payload: dict = {
+        "query": query,
+        "top_k": top_k,
+        "threshold": threshold,
+        "filters": filters,
+        "scope": "global" if global_search else "project",
+    }
     if rerank:
         base_payload["rerank"] = True
 
     try:
-        payload = {**base_payload, "filters": filters}
-        results = _do_search(api_key, payload)[:top_k]
+        results = _do_search(api_key, base_payload)[:top_k]
 
         if min_score > 0:
             results = [m for m in results if m.get("score", 0) >= min_score]
@@ -96,7 +100,7 @@ def format_results_for_context(
     lines = [f"### {heading}", ""]
     for m in memories:
         mid = m.get("id", "?")[:8]
-        text = m.get("memory", "")[:200]
+        text = (m.get("content") or m.get("memory", ""))[:200]
         cat = (m.get("metadata") or {}).get("type", "unknown")
         lines.append(f"- [{cat}] {text} [mem0:{mid}]")
     lines.append("")

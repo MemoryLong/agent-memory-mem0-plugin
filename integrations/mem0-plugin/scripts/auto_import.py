@@ -22,7 +22,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _chunking import filter_and_truncate, split_by_headers
-from _identity import resolve_api_key, resolve_user_id
+from _identity import resolve_api_key, resolve_api_url, resolve_user_id
 from _project import resolve_branch, resolve_project_id, save_project_mapping
 
 log = logging.getLogger("mem0-auto-import")
@@ -41,7 +41,7 @@ if os.environ.get("MEM0_DEBUG"):
     except OSError:
         pass
 
-API_URL = "https://api.mem0.ai"
+API_URL = resolve_api_url()
 MAX_FILE_SIZE = 100_000  # skip files over 100 KB
 TARGET_FILES = ["CLAUDE.md", "AGENTS.md", ".cursorrules", ".windsurfrules", "mem0.md"]
 HASH_STORE = os.path.expanduser("~/.mem0/file_hashes.json")
@@ -121,23 +121,17 @@ def save_hashes(hashes: dict[str, str]) -> None:
         log.warning("Could not save hash store: %s", e)
 
 
-def already_imported(api_key: str, user_id: str, project_id: str, filename: str) -> bool:
+def already_imported(api_key: str, filename: str) -> bool:
     body = json.dumps({
         "query": filename,
-        "filters": {
-            "AND": [
-                {"user_id": user_id},
-                {"app_id": project_id},
-                {"metadata": {"source": "auto-import"}},
-            ]
-        },
+        "filters": {"source": "auto-import"},
         "top_k": 10,
         "threshold": 0.0,
     }).encode()
     req = urllib.request.Request(
-        f"{API_URL}/v3/memories/search/",
+        f"{API_URL}/v1/agent/memory/search",
         data=body,
-        headers={"Content-Type": "application/json", "Authorization": f"Token {api_key}"},
+        headers={"Content-Type": "application/json", "X-API-Key": api_key},
         method="POST",
     )
     try:
@@ -154,24 +148,18 @@ def already_imported(api_key: str, user_id: str, project_id: str, filename: str)
         return False
 
 
-def _delete_stale_chunks(api_key: str, user_id: str, project_id: str, filename: str) -> int:
+def _delete_stale_chunks(api_key: str, filename: str) -> int:
     """Find and delete existing chunks for a file before re-import. Returns count deleted."""
     body = json.dumps({
         "query": filename,
-        "filters": {
-            "AND": [
-                {"user_id": user_id},
-                {"app_id": project_id},
-                {"metadata": {"source": "auto-import"}},
-            ]
-        },
+        "filters": {"source": "auto-import"},
         "top_k": 20,
         "threshold": 0.0,
     }).encode()
     req = urllib.request.Request(
-        f"{API_URL}/v3/memories/search/",
+        f"{API_URL}/v1/agent/memory/search",
         data=body,
-        headers={"Content-Type": "application/json", "Authorization": f"Token {api_key}"},
+        headers={"Content-Type": "application/json", "X-API-Key": api_key},
         method="POST",
     )
     ids_to_delete = []
@@ -196,8 +184,8 @@ def _delete_stale_chunks(api_key: str, user_id: str, project_id: str, filename: 
     for mid in ids_to_delete:
         try:
             del_req = urllib.request.Request(
-                f"{API_URL}/v1/memories/{mid}/",
-                headers={"Authorization": f"Token {api_key}"},
+                f"{API_URL}/v1/agent/memory/{mid}",
+                headers={"X-API-Key": api_key},
                 method="DELETE",
             )
             with urllib.request.urlopen(del_req, timeout=10):
@@ -234,11 +222,11 @@ def post_memory(api_key: str, content: str, user_id: str, filename: str, project
 
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
-        f"{API_URL}/v3/memories/add/",
+        f"{API_URL}/v1/agent/memory/add",
         data=data,
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Token {api_key}",
+            "X-API-Key": api_key,
         },
         method="POST",
     )
@@ -316,12 +304,12 @@ def main() -> None:
 
         hash_key = f"{project_id}:{branch}:{filename}" if branch else f"{project_id}:{filename}"
         if hashes.get(hash_key) == current_hash:
-            if already_imported(api_key, user_id, project_id, filename):
+            if already_imported(api_key, filename):
                 log.debug("Unchanged and still in mem0, skipping: %s", filename)
                 continue
             log.info("Hash matches but memories missing server-side, re-importing: %s", filename)
 
-        elif already_imported(api_key, user_id, project_id, filename):
+        elif already_imported(api_key, filename):
             log.debug("Already in mem0, updating hash store: %s", filename)
             hashes[hash_key] = current_hash
             updated = True
@@ -334,7 +322,7 @@ def main() -> None:
             log.debug("Cannot read %s: %s", filename, e)
             continue
 
-        _delete_stale_chunks(api_key, user_id, project_id, filename)
+        _delete_stale_chunks(api_key, filename)
 
         is_markdown = filename.endswith(".md")
         if is_markdown:

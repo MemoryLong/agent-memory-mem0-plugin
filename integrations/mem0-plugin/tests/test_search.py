@@ -22,7 +22,7 @@ def test_search_memories_returns_results():
         return resp
 
     with patch("urllib.request.urlopen", side_effect=mock_urlopen):
-        results = search_memories("test-key", "user1", "proj1", "auth decisions")
+        results = search_memories("test-key", "auth decisions")
 
     assert len(results) == 2
     assert results[0]["id"] == "abc123"
@@ -42,17 +42,17 @@ def test_search_memories_with_metadata_type():
         return resp
 
     with patch("urllib.request.urlopen", side_effect=mock_urlopen):
-        search_memories("key", "user", "proj", "query", metadata_type="decision")
+        search_memories("key", "query", metadata_type="decision")
 
     filters = captured_body["filters"]
-    assert {"metadata": {"type": "decision"}} in filters["AND"]
+    assert filters == {"type": "decision"}
 
 
 def test_search_memories_handles_api_error():
     from _search import search_memories
 
     with patch("urllib.request.urlopen", side_effect=Exception("timeout")):
-        results = search_memories("key", "user", "proj", "query")
+        results = search_memories("key", "query")
 
     assert results == []
 
@@ -70,7 +70,7 @@ def test_search_memories_handles_list_response():
         return resp
 
     with patch("urllib.request.urlopen", side_effect=mock_urlopen):
-        results = search_memories("key", "user", "proj", "query")
+        results = search_memories("key", "query")
 
     assert len(results) == 1
 
@@ -89,7 +89,7 @@ def test_search_memories_respects_top_k():
         return resp
 
     with patch("urllib.request.urlopen", side_effect=mock_urlopen):
-        search_memories("key", "user", "proj", "query", top_k=5)
+        search_memories("key", "query", top_k=5)
 
     assert captured_body["top_k"] == 5
 
@@ -97,7 +97,7 @@ def test_search_memories_respects_top_k():
 def test_search_memories_no_api_key_returns_empty():
     from _search import search_memories
 
-    results = search_memories("", "user", "proj", "query")
+    results = search_memories("", "query")
     assert results == []
 
 
@@ -116,7 +116,7 @@ def test_search_memories_omits_rerank_by_default():
         return resp
 
     with patch("urllib.request.urlopen", side_effect=mock_urlopen):
-        search_memories("key", "user", "proj", "query")
+        search_memories("key", "query")
 
     assert "rerank" not in captured_body
 
@@ -137,7 +137,7 @@ def test_search_memories_forwards_rerank_true():
         return resp
 
     with patch("urllib.request.urlopen", side_effect=mock_urlopen):
-        search_memories("key", "user", "proj", "query", rerank=True)
+        search_memories("key", "query", rerank=True)
 
     assert captured_body.get("rerank") is True
 

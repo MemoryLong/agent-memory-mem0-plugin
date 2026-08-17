@@ -58,8 +58,6 @@ if [ -n "$TRACE_FILES" ]; then
   FILE_DISPLAY=$(echo "$TRACE_FILES" | sed 's/^/  - /')
 fi
 
-USER_ID="${MEM0_RESOLVED_USER_ID:-${USER:-default}}"
-
 # Extract query (first 80 chars of error line)
 ERROR_QUERY=$(echo "$ERROR_LINE" | cut -c1-80)
 
@@ -72,21 +70,19 @@ if [ -z "${MEM0_API_KEY:-}" ]; then
 fi
 
 # Pre-fetch memories: anti_pattern and bug_fix searches
-RESULTS=$(PYTHONPATH="$SCRIPT_DIR" MEM0_SEARCH_QUERY="$ERROR_QUERY" MEM0_SEARCH_USER="$USER_ID" \
-  MEM0_API_KEY="${MEM0_API_KEY}" MEM0_PROJECT_ID="${MEM0_PROJECT_ID:-unknown}" \
+RESULTS=$(PYTHONPATH="$SCRIPT_DIR" MEM0_SEARCH_QUERY="$ERROR_QUERY" \
+  MEM0_API_KEY="${MEM0_API_KEY}" \
   python3 -c "
 import os, sys
 sys.path.insert(0, os.environ.get('PYTHONPATH', '.'))
 from _search import search_memories, format_results_for_context, should_rerank
 
 api_key = os.environ.get('MEM0_API_KEY', '')
-user_id = os.environ.get('MEM0_SEARCH_USER', 'default')
-project_id = os.environ.get('MEM0_PROJECT_ID', 'unknown')
 query = os.environ.get('MEM0_SEARCH_QUERY', '')
 rerank = should_rerank()
 
-r1 = search_memories(api_key, user_id, project_id, query, metadata_type='anti_pattern', top_k=3, rerank=rerank)
-r2 = search_memories(api_key, user_id, project_id, query, metadata_type='bug_fix', top_k=3, rerank=rerank)
+r1 = search_memories(api_key, query, metadata_type='anti_pattern', top_k=3, rerank=rerank)
+r2 = search_memories(api_key, query, metadata_type='bug_fix', top_k=3, rerank=rerank)
 
 seen = set()
 combined = []

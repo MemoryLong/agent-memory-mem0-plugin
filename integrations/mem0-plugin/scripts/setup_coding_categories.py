@@ -197,8 +197,8 @@ def main() -> int:
     except Exception as e:
         print(
             f"ERROR initialising MemoryClient: {e}\n"
-            "Most commonly this is an invalid MEM0_API_KEY -- check the key at "
-            "https://app.mem0.ai/dashboard/api-keys",
+            "Most commonly this is an invalid MEM0_API_KEY -- use a local sk-... key "
+            "from your agent-memory site",
             file=sys.stderr,
         )
         return 1

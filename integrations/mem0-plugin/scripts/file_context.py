@@ -6,8 +6,8 @@ memories that reference that file path and returns a compact timeline
 of prior work. This gives Claude context like "last time you fixed a
 null pointer here" before it reads the file.
 
-Modeled after claude-mem's file-context handler but adapted for mem0's
-cloud API architecture.
+Modeled after claude-mem's file-context handler but adapted for the local
+mem0 backend.
 
 Input:  file_path (positional arg), env vars for identity
 Output: JSON to stdout with hookSpecificOutput.additionalContext
@@ -21,8 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _formatting import TYPE_ICONS, format_age
-from _identity import resolve_api_key, resolve_user_id
-from _project import resolve_project_id
+from _identity import resolve_api_key
 from _search import search_memories, should_rerank
 
 FILE_READ_GATE_MIN_BYTES = 1500
@@ -69,7 +68,7 @@ def format_timeline(memories: list[dict], file_path: str) -> str:
 
     for m in memories:
         mid = m.get("id", "?")[:8]
-        text = (m.get("memory", "") or "")[:150].replace("\n", " ").strip()
+        text = (m.get("content") or m.get("memory", "") or "")[:150].replace("\n", " ").strip()
         meta = m.get("metadata") or {}
         cat = meta.get("type", "unknown")
         icon = TYPE_ICONS.get(cat, "❓")
@@ -80,9 +79,7 @@ def format_timeline(memories: list[dict], file_path: str) -> str:
     return "\n".join(lines)
 
 
-def search_file_context(
-    api_key: str, user_id: str, project_id: str, file_path: str, cwd: str
-) -> str:
+def search_file_context(api_key: str, file_path: str, cwd: str) -> str:
     """Search mem0 for memories related to a file path."""
     global_search = os.environ.get("MEM0_GLOBAL_SEARCH", "false") == "true"
     rel = relative_path(file_path, cwd)
@@ -90,7 +87,7 @@ def search_file_context(
 
     query = f"{rel} {basename}" if rel != basename else rel
     results = search_memories(
-        api_key, user_id, project_id, query,
+        api_key, query,
         top_k=MAX_RESULTS, threshold=0.3,
         global_search=global_search,
         rerank=should_rerank(),
@@ -116,10 +113,7 @@ def main():
     if not resolved:
         sys.exit(0)
 
-    user_id = resolve_user_id()
-    project_id = resolve_project_id(cwd)
-
-    timeline = search_file_context(api_key, user_id, project_id, resolved, cwd)
+    timeline = search_file_context(api_key, resolved, cwd)
     if not timeline:
         sys.exit(0)
 

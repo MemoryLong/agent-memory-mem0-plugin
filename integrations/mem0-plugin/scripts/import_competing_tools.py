@@ -30,10 +30,10 @@ from _chunking import (
     split_by_headers,
     split_by_hr_or_headers,
 )
-from _identity import resolve_api_key, resolve_user_id
+from _identity import resolve_api_key, resolve_api_url, resolve_user_id
 from _project import resolve_branch, resolve_project_id
 
-API_URL = "https://api.mem0.ai"
+API_URL = resolve_api_url()
 HASH_STORE = os.path.expanduser("~/.mem0/import_hashes.json")
 
 
@@ -83,11 +83,11 @@ def post_memory(api_key: str, content: str, user_id: str, project_id: str, branc
     }
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
-        f"{API_URL}/v3/memories/add/",
+        f"{API_URL}/v1/agent/memory/add",
         data=data,
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Token {api_key}",
+            "X-API-Key": api_key,
         },
         method="POST",
     )

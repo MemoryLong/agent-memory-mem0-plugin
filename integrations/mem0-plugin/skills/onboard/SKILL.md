@@ -42,18 +42,18 @@ Step 1: Setting up API key.
 
 - API key not found. Let's set it up.
 
-  1. Get your API key from https://app.mem0.ai/dashboard/api-keys
+  1. Get your local API key (sk-...) from your agent-memory site
 
   2. Choose ONE method:
 
      Option A — CLI (shell profile):
-       echo 'export MEM0_API_KEY="m0-your-key-here"' >> ~/.zshrc
+       echo 'export MEM0_API_KEY="sk-your-key-here"' >> ~/.zshrc
        source ~/.zshrc
 
      Option B — Desktop app (local environment editor):
        Click the environment dropdown next to the prompt box,
        hover over "Local", click the gear icon, and add:
-         MEM0_API_KEY = m0-your-key-here
+         MEM0_API_KEY = sk-your-key-here
        (Stored encrypted on your machine, applies to all local sessions)
 
      Note: The Desktop app does NOT inherit custom env vars from
@@ -77,7 +77,7 @@ The MCP server authenticates using the `MEM0_API_KEY` set in Step 1. No OAuth or
 
 1. Verify the API key is set (re-run the Step 1 check)
 2. Check the plugin is installed: run `/plugins` and confirm `mem0` appears
-3. Check the MCP server is listed: run `/mcp` and look for `mcp.mem0.ai`
+3. Check the MCP server is listed: run `/mcp` and confirm the `mem0` server appears (URL from `MEM0_MCP_URL`)
 4. If the server shows an error, ask the user to restart Claude Code and run `/mem0:onboard` again
 5. If all checks pass but tools are still missing: "Restart Claude Code and run `/mem0:onboard` again."
 
@@ -85,13 +85,11 @@ The MCP server authenticates using the `MEM0_API_KEY` set in Step 1. No OAuth or
 
 ## Step 3: Verify connectivity and show identity
 
-Call `search_memories` with `query="project setup"`, `filters={"AND": [{"user_id": "<active_user_id>"}, {"app_id": "<active_project_id>"}]}`, `top_k=1` to verify connectivity.
+Call `search_memories` with `query="project setup"`, `top_k=1` to verify connectivity.
 
 Print:
 ```
 - Connected
-  user:    <user_id>
-  project: <project_id>
   branch:  <branch>
 ```
 
@@ -172,8 +170,6 @@ Then retry the categories script.
 Print a summary:
 ```
 - Onboarding complete.
-  user_id:    <user_id>
-  project_id: <project_id> (app_id)
   files:      <N> found, <M> imported
   categories: <installed | already configured>
 

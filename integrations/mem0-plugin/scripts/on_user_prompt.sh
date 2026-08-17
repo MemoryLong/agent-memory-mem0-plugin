@@ -113,23 +113,19 @@ if [ -z "${MEM0_API_KEY:-}" ]; then
   fi
   exit 0
 fi
-USER_ID="$MEM0_RESOLVED_USER_ID"
-
 _PROMPT_CTX=""
 
 if [ -n "$HAS_RESUME" ]; then
-  RESUME_RESULTS=$(PYTHONPATH="$SCRIPT_DIR" MEM0_SEARCH_USER="$USER_ID" python3 -c "
+  RESUME_RESULTS=$(PYTHONPATH="$SCRIPT_DIR" python3 -c "
 import os, sys
 sys.path.insert(0, os.environ.get('PYTHONPATH', '.'))
 from _search import search_memories, format_results_for_context, should_rerank
 
 api_key = os.environ.get('MEM0_API_KEY', '')
-user_id = os.environ.get('MEM0_SEARCH_USER', 'default')
-project_id = os.environ.get('MEM0_PROJECT_ID', 'unknown')
 rerank = should_rerank()
 
-state = search_memories(api_key, user_id, project_id, 'session state current task', metadata_type='session_state', top_k=3, rerank=rerank)
-decisions = search_memories(api_key, user_id, project_id, 'recent decisions and learnings', metadata_type='decision', top_k=3, rerank=rerank)
+state = search_memories(api_key, 'session state current task', metadata_type='session_state', top_k=3, rerank=rerank)
+decisions = search_memories(api_key, 'recent decisions and learnings', metadata_type='decision', top_k=3, rerank=rerank)
 
 all_r = state + decisions
 seen = set()
@@ -158,17 +154,15 @@ fi
 # to fetch. Skipped on resume (handled above with targeted queries) and when
 # MEM0_PREFETCH=false.
 if [ -z "$HAS_RESUME" ] && [ "${MEM0_PREFETCH:-true}" != "false" ]; then
-  PREFETCH_RESULTS=$(PYTHONPATH="$SCRIPT_DIR" MEM0_SEARCH_USER="$USER_ID" MEM0_SEARCH_QUERY="$PROMPT" python3 -c "
+  PREFETCH_RESULTS=$(PYTHONPATH="$SCRIPT_DIR" MEM0_SEARCH_QUERY="$PROMPT" python3 -c "
 import os, sys
 sys.path.insert(0, os.environ.get('PYTHONPATH', '.'))
 from _search import search_memories, format_results_for_context, should_rerank
 
 api_key = os.environ.get('MEM0_API_KEY', '')
-user_id = os.environ.get('MEM0_SEARCH_USER', 'default')
-project_id = os.environ.get('MEM0_PROJECT_ID', 'unknown')
 query = os.environ.get('MEM0_SEARCH_QUERY', '')
 
-results = search_memories(api_key, user_id, project_id, query, top_k=5, rerank=should_rerank())
+results = search_memories(api_key, query, top_k=5, rerank=should_rerank())
 if results:
     print(format_results_for_context(results, heading='Relevant memories (auto-retrieved for this request)'))
 " 2>/dev/null || echo "")

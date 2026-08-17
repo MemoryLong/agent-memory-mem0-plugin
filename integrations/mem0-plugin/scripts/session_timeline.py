@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Fetch recent memories and format a compact timeline for SessionStart.
 
-Searches mem0 cloud API for the most recent memories in the project
-and formats them as a compact activity timeline injected below the
-existing SessionStart banner.
+Fetches the most recent memories from the local backend and formats them
+as a compact activity timeline injected below the SessionStart banner.
 
-Input:  env vars for identity (MEM0_API_KEY, MEM0_RESOLVED_USER_ID, etc.)
+Input:  env vars (MEM0_API_KEY, MEM0_BASE_URL)
 Output: Compact timeline text to stdout (empty if nothing found)
 """
 
@@ -18,33 +17,20 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _formatting import TYPE_ICONS, format_age
-from _identity import resolve_api_key, resolve_user_id
-from _project import resolve_project_id
+from _identity import resolve_api_key, resolve_api_url
 
-API_URL = "https://api.mem0.ai"
+API_URL = resolve_api_url()
 MAX_RECENT = 10
-MAX_SUMMARIES = 3
 FETCH_TIMEOUT = 5
 
 
-def fetch_recent_memories(api_key: str, user_id: str, project_id: str) -> list[dict]:
-    """Fetch the most recent memories for this project via GET list endpoint."""
-    global_search = os.environ.get("MEM0_GLOBAL_SEARCH", "false") == "true"
-
-    if global_search:
-        filters = {"OR": [{"user_id": "*"}]}
-    else:
-        filters = {"AND": [{"user_id": user_id}, {"app_id": project_id}]}
-
-    body = json.dumps({"filters": filters}).encode()
+def fetch_recent_memories(api_key: str) -> list[dict]:
+    """Fetch the most recent memories via the local list endpoint.
+    Identity (user/app) is resolved from X-API-Key; no filters needed."""
     req = urllib.request.Request(
-        f"{API_URL}/v3/memories/?page=1&page_size={MAX_RECENT}",
-        data=body,
-        headers={
-            "Authorization": f"Token {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
+        f"{API_URL}/v1/agent/memory?page=1&page_size={MAX_RECENT}",
+        headers={"X-API-Key": api_key},
+        method="GET",
     )
     try:
         with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as r:
@@ -67,7 +53,7 @@ def format_timeline(memories: list[dict]) -> str:
 
     for m in memories:
         mid = m.get("id", "?")[:8]
-        text = (m.get("memory", "") or "")[:120].replace("\n", " ").strip()
+        text = (m.get("content") or m.get("memory", "") or "")[:120].replace("\n", " ").strip()
         meta = m.get("metadata") or {}
         cat = meta.get("type", "unknown")
         icon = TYPE_ICONS.get(cat, "❓")
@@ -86,10 +72,7 @@ def main():
     if not api_key:
         return
 
-    user_id = resolve_user_id()
-    project_id = resolve_project_id(os.environ.get("MEM0_CWD"))
-
-    memories = fetch_recent_memories(api_key, user_id, project_id)
+    memories = fetch_recent_memories(api_key)
     if not memories:
         return
 

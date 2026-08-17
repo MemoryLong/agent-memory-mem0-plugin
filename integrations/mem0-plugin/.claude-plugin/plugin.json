@@ -13,8 +13,8 @@
   "userConfig": {
     "api_key": {
       "type": "string",
-      "title": "Mem0 API Key",
-      "description": "Your Mem0 Platform API key (starts with m0-). Get one at https://app.mem0.ai/dashboard/api-keys",
+      "title": "Memory API Key",
+      "description": "Your local memory backend API key (starts with sk-).",
       "sensitive": true,
       "required": true
     }

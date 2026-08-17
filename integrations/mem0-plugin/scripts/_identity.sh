@@ -45,6 +45,12 @@ if [ -z "${MEM0_API_KEY:-}" ]; then
   done
 fi
 
+# Apply backend URL defaults (MEM0_* env vars are the single config surface)
+MEM0_BASE_URL="${MEM0_BASE_URL:-http://localhost:18100}"
+export MEM0_BASE_URL
+MEM0_MCP_URL="${MEM0_MCP_URL:-http://localhost:18101/v1/agent/mcp/memory/mcp}"
+export MEM0_MCP_URL
+
 _mem0_resolve_identity() {
   if [ -n "${MEM0_USER_ID:-}" ]; then
     printf '%s' "$MEM0_USER_ID"
