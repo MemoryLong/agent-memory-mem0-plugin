@@ -1,4 +1,4 @@
-"""Resolve mem0 identity: API key, user_id, and settings.
+"""Resolve mem0 identity: API key and settings.
 
 API key resolution (first non-empty wins):
   1. MEM0_API_KEY env var (explicit / shell profile)
@@ -7,10 +7,6 @@ API key resolution (first non-empty wins):
   4. Extract from shell profile files (~/.zshrc, ~/.bashrc, etc.)
      Desktop app doesn't inherit shell env — this covers users who
      set MEM0_API_KEY in their profile but use the Desktop app.
-
-User ID resolution:
-  1. MEM0_USER_ID env var (explicit override)
-  2. $USER, else "default"
 
 Settings resolution:
   ~/.mem0/settings.json (user-editable, falls back to defaults)
@@ -66,13 +62,6 @@ def resolve_api_key() -> str:
     if key:
         return key
     return ""
-
-
-def resolve_user_id() -> str:
-    explicit = os.environ.get("MEM0_USER_ID", "").strip()
-    if explicit:
-        return explicit
-    return os.environ.get("USER") or "default"
 
 
 def resolve_api_url() -> str:

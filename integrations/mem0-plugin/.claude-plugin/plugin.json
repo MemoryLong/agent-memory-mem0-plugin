@@ -17,6 +17,20 @@
       "description": "Your local memory backend API key (starts with sk-).",
       "sensitive": true,
       "required": true
+    },
+    "base_url": {
+      "type": "string",
+      "title": "Memory API Base URL",
+      "description": "Base URL of the memory backend REST API (e.g. http://your-server:18100).",
+      "default": "http://localhost:18100",
+      "required": true
+    },
+    "mcp_url": {
+      "type": "string",
+      "title": "Memory MCP Server URL",
+      "description": "Full URL of the memory MCP server endpoint. (e.g. http://your-server:18101/v1/agent/mcp/memory/mcp).",
+      "default": "http://localhost:18101/v1/agent/mcp/memory/mcp",
+      "required": true
     }
   }
 }

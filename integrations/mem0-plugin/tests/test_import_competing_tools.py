@@ -191,7 +191,7 @@ def _make_mock_response(status: int = 201, body: dict | None = None) -> mock.Mag
 
 
 def test_cursorrules_import_api_call(tmp_path):
-    """cmd_cursorrules calls the API with correct app_id (top-level), infer=False, and correct source."""
+    """cmd_cursorrules calls the API without identity fields, infer=False, and correct source."""
     from import_competing_tools import cmd_cursorrules
 
     # Create a .cursorrules file with enough content
@@ -209,7 +209,6 @@ def test_cursorrules_import_api_call(tmp_path):
         return _make_mock_response(201)
 
     with mock.patch("import_competing_tools.resolve_api_key", return_value="m0-testkey"), \
-         mock.patch("import_competing_tools.resolve_user_id", return_value="testuser"), \
          mock.patch("import_competing_tools.resolve_project_id", return_value="my-project"), \
          mock.patch("import_competing_tools.resolve_branch", return_value="main"), \
          mock.patch("urllib.request.urlopen", side_effect=mock_urlopen):
@@ -225,8 +224,8 @@ def test_cursorrules_import_api_call(tmp_path):
 
     req_body = captured_requests[0]
 
-    # app_id must be top-level (not inside metadata)
-    assert req_body["app_id"] == "my-project", f"Expected app_id at top level, got: {req_body}"
+    # identity is resolved from the API key — no user_id/app_id in the body
+    assert "app_id" not in req_body, f"Expected no app_id in body, got: {req_body}"
 
     # infer must be False (not "false", but the boolean False)
     assert req_body["infer"] is False, f"Expected infer=False, got: {req_body['infer']}"
@@ -236,8 +235,7 @@ def test_cursorrules_import_api_call(tmp_path):
         f"Expected source=cursor-import, got: {req_body['metadata'].get('source')}"
     )
 
-    # user_id must be set
-    assert req_body["user_id"] == "testuser"
+    assert "user_id" not in req_body, f"Expected no user_id in body, got: {req_body}"
 
     # messages must be a list with role/content
     assert isinstance(req_body["messages"], list)
@@ -264,7 +262,6 @@ def test_copilot_import_api_call(tmp_path):
         return _make_mock_response(201)
 
     with mock.patch("import_competing_tools.resolve_api_key", return_value="m0-key"), \
-         mock.patch("import_competing_tools.resolve_user_id", return_value="user1"), \
          mock.patch("import_competing_tools.resolve_project_id", return_value="proj1"), \
          mock.patch("import_competing_tools.resolve_branch", return_value="main"), \
          mock.patch("urllib.request.urlopen", side_effect=mock_urlopen):
@@ -273,7 +270,7 @@ def test_copilot_import_api_call(tmp_path):
 
     assert len(captured) >= 1
     assert captured[0]["metadata"]["source"] == "copilot-import"
-    assert captured[0]["app_id"] == "proj1"
+    assert "app_id" not in captured[0]
     assert captured[0]["infer"] is False
 
 
@@ -300,7 +297,6 @@ def test_cline_import_multiple_files(tmp_path):
         return _make_mock_response(201)
 
     with mock.patch("import_competing_tools.resolve_api_key", return_value="m0-key"), \
-         mock.patch("import_competing_tools.resolve_user_id", return_value="user1"), \
          mock.patch("import_competing_tools.resolve_project_id", return_value="proj1"), \
          mock.patch("import_competing_tools.resolve_branch", return_value="main"), \
          mock.patch("urllib.request.urlopen", side_effect=mock_urlopen):
@@ -313,7 +309,7 @@ def test_cline_import_multiple_files(tmp_path):
     assert sources == {"cline-import"}
     for r in captured:
         assert r["infer"] is False
-        assert r["app_id"] == "proj1"
+        assert "app_id" not in r
 
 
 def test_no_api_key_does_not_call_api(tmp_path):

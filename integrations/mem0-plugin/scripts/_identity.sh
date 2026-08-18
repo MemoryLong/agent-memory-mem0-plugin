@@ -45,9 +45,16 @@ if [ -z "${MEM0_API_KEY:-}" ]; then
   done
 fi
 
-# Apply backend URL defaults (MEM0_* env vars are the single config surface)
+# Resolve backend URLs: env var > userConfig (UI prompt) > default
+if [ -z "${MEM0_BASE_URL:-}" ] && [ -n "${CLAUDE_PLUGIN_OPTION_BASE_URL:-}" ]; then
+  MEM0_BASE_URL="$CLAUDE_PLUGIN_OPTION_BASE_URL"
+fi
 MEM0_BASE_URL="${MEM0_BASE_URL:-http://localhost:18100}"
 export MEM0_BASE_URL
+
+if [ -z "${MEM0_MCP_URL:-}" ] && [ -n "${CLAUDE_PLUGIN_OPTION_MCP_URL:-}" ]; then
+  MEM0_MCP_URL="$CLAUDE_PLUGIN_OPTION_MCP_URL"
+fi
 MEM0_MCP_URL="${MEM0_MCP_URL:-http://localhost:18101/v1/agent/mcp/memory/mcp}"
 export MEM0_MCP_URL
 

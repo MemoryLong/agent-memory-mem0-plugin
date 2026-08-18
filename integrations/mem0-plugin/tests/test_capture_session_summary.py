@@ -45,9 +45,7 @@ def test_files_touched_is_json_array_not_double_encoded(monkeypatch):
     css.store_summary(
         api_key="test-key",
         summary_prompt="did some work",
-        user_id="u1",
         session_id="s1",
-        project_id="p1",
         branch="main",
         files=files,
     )
@@ -69,9 +67,7 @@ def test_files_touched_omitted_when_no_files(monkeypatch):
     css.store_summary(
         api_key="test-key",
         summary_prompt="did some work",
-        user_id="u1",
         session_id="s1",
-        project_id="p1",
         branch="main",
         files=[],
     )

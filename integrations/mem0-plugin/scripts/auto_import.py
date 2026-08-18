@@ -19,10 +19,11 @@ import os
 import sys
 import urllib.error
 import urllib.request
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _chunking import filter_and_truncate, split_by_headers
-from _identity import resolve_api_key, resolve_api_url, resolve_user_id
+from _identity import resolve_api_key, resolve_api_url
 from _project import resolve_branch, resolve_project_id, save_project_mapping
 
 log = logging.getLogger("mem0-auto-import")
@@ -131,7 +132,7 @@ def already_imported(api_key: str, filename: str) -> bool:
     req = urllib.request.Request(
         f"{API_URL}/v1/agent/memory/search",
         data=body,
-        headers={"Content-Type": "application/json", "X-API-Key": api_key},
+        headers={"Content-Type": "application/json", "X-API-Key": api_key, "Idempotency-Key": str(uuid.uuid4())},
         method="POST",
     )
     try:
@@ -159,7 +160,7 @@ def _delete_stale_chunks(api_key: str, filename: str) -> int:
     req = urllib.request.Request(
         f"{API_URL}/v1/agent/memory/search",
         data=body,
-        headers={"Content-Type": "application/json", "X-API-Key": api_key},
+        headers={"Content-Type": "application/json", "X-API-Key": api_key, "Idempotency-Key": str(uuid.uuid4())},
         method="POST",
     )
     ids_to_delete = []
@@ -185,7 +186,7 @@ def _delete_stale_chunks(api_key: str, filename: str) -> int:
         try:
             del_req = urllib.request.Request(
                 f"{API_URL}/v1/agent/memory/{mid}",
-                headers={"X-API-Key": api_key},
+                headers={"X-API-Key": api_key, "Idempotency-Key": str(uuid.uuid4())},
                 method="DELETE",
             )
             with urllib.request.urlopen(del_req, timeout=10):
@@ -198,7 +199,7 @@ def _delete_stale_chunks(api_key: str, filename: str) -> int:
     return deleted
 
 
-def post_memory(api_key: str, content: str, user_id: str, filename: str, project_id: str, branch: str = "") -> bool:
+def post_memory(api_key: str, content: str, filename: str, project_id: str, branch: str = "") -> bool:
     """POST a project profile memory to the Mem0 REST API."""
     metadata = {
         "type": "project_profile",
@@ -214,8 +215,6 @@ def post_memory(api_key: str, content: str, user_id: str, filename: str, project
                 "content": f"## Project Profile: {filename}\n\nProject: {project_id}\n\n{content}",
             }
         ],
-        "user_id": user_id,
-        "app_id": project_id,
         "metadata": metadata,
         "infer": False,
     }
@@ -227,6 +226,7 @@ def post_memory(api_key: str, content: str, user_id: str, filename: str, project
         headers={
             "Content-Type": "application/json",
             "X-API-Key": api_key,
+            "Idempotency-Key": str(uuid.uuid4()),
         },
         method="POST",
     )
@@ -250,7 +250,6 @@ def main() -> None:
         return
 
     cwd = os.environ.get("MEM0_CWD", "").strip() or os.getcwd()
-    user_id = resolve_user_id()
     project_id = resolve_project_id(cwd)
     branch = resolve_branch(cwd)
 
@@ -261,7 +260,7 @@ def main() -> None:
     if git_root and os.path.realpath(git_root) != os.path.realpath(cwd):
         search_dirs.append(git_root)
 
-    log.debug("Auto-import started: cwd=%s git_root=%s project=%s user=%s branch=%s", cwd, git_root or "(none)", project_id, user_id, branch)
+    log.debug("Auto-import started: cwd=%s git_root=%s project=%s branch=%s", cwd, git_root or "(none)", project_id, branch)
 
     hashes = load_hashes()
     updated = False
@@ -336,7 +335,7 @@ def main() -> None:
         success = True
         for i, chunk in enumerate(chunks):
             chunk_name = f"{filename}[{i+1}/{len(chunks)}]" if len(chunks) > 1 else filename
-            if not post_memory(api_key, chunk, user_id, chunk_name, project_id, branch):
+            if not post_memory(api_key, chunk, chunk_name, project_id, branch):
                 success = False
 
         if success:

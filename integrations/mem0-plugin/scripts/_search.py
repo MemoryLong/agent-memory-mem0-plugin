@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.request
+import uuid
 
 from _identity import resolve_api_url
 
@@ -40,7 +41,7 @@ def _do_search(api_key: str, payload: dict) -> list[dict]:
     req = urllib.request.Request(
         SEARCH_URL,
         data=body,
-        headers={"X-API-Key": api_key, "Content-Type": "application/json"},
+        headers={"X-API-Key": api_key, "Content-Type": "application/json", "Idempotency-Key": str(uuid.uuid4())},
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=SEARCH_TIMEOUT) as r:

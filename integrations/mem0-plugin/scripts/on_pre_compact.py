@@ -20,11 +20,12 @@ import os
 import sys
 import urllib.error
 import urllib.request
+import uuid
 from datetime import date, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _identity import resolve_api_key, resolve_api_url, resolve_user_id
-from _project import resolve_branch, resolve_project_id
+from _identity import resolve_api_key, resolve_api_url
+from _project import resolve_branch
 
 log = logging.getLogger("mem0-capture")
 log.setLevel(logging.DEBUG)
@@ -158,7 +159,7 @@ def build_content(state: dict, source: str) -> str:
     return "\n".join(parts)
 
 
-def store_memory(api_key: str, content: str, user_id: str, source: str, session_id: str = "", project_id: str = "", branch: str = "") -> bool:
+def store_memory(api_key: str, content: str, source: str, session_id: str = "", branch: str = "") -> bool:
     """Store session state as a memory via the Mem0 REST API."""
     expires = (date.today() + timedelta(days=SESSION_STATE_EXPIRY_DAYS)).isoformat()
     metadata = {
@@ -172,8 +173,6 @@ def store_memory(api_key: str, content: str, user_id: str, source: str, session_
         "messages": [
             {"role": "user", "content": content}
         ],
-        "user_id": user_id,
-        "app_id": project_id,
         "metadata": metadata,
         "expiration_date": expires,
         "infer": True,
@@ -186,6 +185,7 @@ def store_memory(api_key: str, content: str, user_id: str, source: str, session_
         headers={
             "Content-Type": "application/json",
             "X-API-Key": api_key,
+            "Idempotency-Key": str(uuid.uuid4()),
         },
         method="POST",
     )
@@ -262,8 +262,6 @@ def main():
 
     session_id = hook_input.get("session_id", "")
     cwd = hook_input.get("cwd") or None
-    user_id = resolve_user_id()
-    project_id = resolve_project_id(cwd)
     branch = resolve_branch(cwd)
 
     lines = tail_lines(transcript_path, MAX_TAIL_LINES)
@@ -300,7 +298,7 @@ def main():
         return
 
     log.info("Fallback capture: %d files modified", len(state["files_modified"]))
-    stored = store_memory(api_key, content, user_id, source, session_id, project_id, branch)
+    stored = store_memory(api_key, content, source, session_id, branch)
 
     if show_status:
         print(format_status(state, source, stored))

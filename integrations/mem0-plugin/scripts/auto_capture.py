@@ -5,7 +5,7 @@ Runs in the background from UserPromptSubmit hook (every 3rd message).
 Reads the last few exchanges from the transcript, sends them to the
 mem0 API with infer=True so the platform extracts facts automatically.
 
-Input:  env vars (MEM0_API_KEY, MEM0_RESOLVED_USER_ID, MEM0_PROJECT_ID, etc.)
+Input:  env vars (MEM0_API_KEY, MEM0_BASE_URL, etc.)
         argv[1] = transcript_path
 Output: stderr logs only (exit 0 always — must not block)
 """
@@ -18,11 +18,12 @@ import os
 import sys
 import urllib.error
 import urllib.request
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _identity import resolve_api_key, resolve_api_url, resolve_user_id
+from _identity import resolve_api_key, resolve_api_url
 from _instructions import load_instructions
-from _project import resolve_branch, resolve_project_id
+from _project import resolve_branch
 
 log = logging.getLogger("mem0-auto-capture")
 log.setLevel(logging.DEBUG)
@@ -108,8 +109,7 @@ def extract_recent_exchanges(lines: list[str], max_exchanges: int = 3) -> list[d
     return result
 
 
-def store_exchange(api_key: str, messages: list[dict], user_id: str,
-                   project_id: str, branch: str, session_id: str) -> bool:
+def store_exchange(api_key: str, messages: list[dict], branch: str, session_id: str) -> bool:
     metadata = {
         "type": "auto_capture",
         "source": "auto_capture",
@@ -122,8 +122,6 @@ def store_exchange(api_key: str, messages: list[dict], user_id: str,
 
     body = {
         "messages": messages,
-        "user_id": user_id,
-        "app_id": project_id,
         "metadata": metadata,
         "infer": True,
     }
@@ -137,6 +135,7 @@ def store_exchange(api_key: str, messages: list[dict], user_id: str,
         headers={
             "Content-Type": "application/json",
             "X-API-Key": api_key,
+            "Idempotency-Key": str(uuid.uuid4()),
         },
         method="POST",
     )
@@ -169,8 +168,6 @@ def main():
         log.debug("Transcript not found: %s", transcript_path)
         return
 
-    user_id = resolve_user_id()
-    project_id = resolve_project_id()
     branch = resolve_branch()
     session_id = ""
     sid_file = f"/tmp/mem0_session_id_{os.environ.get('USER', 'default')}"
@@ -197,7 +194,7 @@ def main():
         return
 
     log.info("Auto-capturing %d messages (%d chars)", len(messages), total_chars)
-    if store_exchange(api_key, messages, user_id, project_id, branch, session_id):
+    if store_exchange(api_key, messages, branch, session_id):
         try:
             import session_stats
             session_stats.record_add("auto_capture")

@@ -55,7 +55,7 @@ Mem0 — Setup Required | user=${_UID} | project=${_PID} | branch=${_BR} | auth=
 \`\`\`
 
 MEM0_API_KEY is not set. To configure:
-- **Reinstall the plugin**: Uninstall and reinstall — Claude Code will prompt for your API key during setup (stored securely in keychain)
+- **Reinstall the plugin**: Uninstall and reinstall — Claude Code will prompt for your API key, base URL, and MCP URL during setup (stored securely in keychain)
 - **Desktop app**: Click the environment dropdown next to the prompt box → hover over **Local** → click the **gear icon** → add \`MEM0_API_KEY=sk-...\`
 - **CLI**: Add \`export MEM0_API_KEY=sk-...\` to your shell profile (~/.zshrc or ~/.bashrc)
 - Get a local API key (\`sk-...\`) from your agent-memory site

@@ -56,9 +56,7 @@ def test_session_summary_posts_assistant_prose_as_assistant(monkeypatch):
     css.store_summary(
         api_key="test-key",
         summary_prompt=css.build_summary_prompt(ASSISTANT_PROSE, []),
-        user_id="u1",
         session_id="s1",
-        project_id="p1",
         branch="main",
         files=[],
     )
@@ -84,9 +82,7 @@ def test_compact_summary_posts_assistant_prose_as_assistant(monkeypatch):
     ccs.store_summary(
         api_key="test-key",
         summary=ASSISTANT_PROSE,
-        user_id="u1",
         session_id="s1",
-        project_id="p1",
         branch="main",
     )
 
@@ -110,9 +106,7 @@ def test_no_user_role_message_carries_assistant_prose(monkeypatch):
     css.store_summary(
         api_key="test-key",
         summary_prompt=css.build_summary_prompt(ASSISTANT_PROSE, ["auth.py"]),
-        user_id="u1",
         session_id="s1",
-        project_id="p1",
         branch="main",
         files=["auth.py"],
     )

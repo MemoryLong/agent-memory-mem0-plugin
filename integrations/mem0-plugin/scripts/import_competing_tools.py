@@ -23,6 +23,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _chunking import (
@@ -30,7 +31,7 @@ from _chunking import (
     split_by_headers,
     split_by_hr_or_headers,
 )
-from _identity import resolve_api_key, resolve_api_url, resolve_user_id
+from _identity import resolve_api_key, resolve_api_url
 from _project import resolve_branch, resolve_project_id
 
 API_URL = resolve_api_url()
@@ -65,7 +66,7 @@ def _content_hash(content: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def post_memory(api_key: str, content: str, user_id: str, project_id: str, branch: str, source: str) -> bool:
+def post_memory(api_key: str, content: str, branch: str, source: str) -> bool:
     """POST a single memory chunk to the mem0 API."""
     metadata: dict = {
         "type": "project_profile",
@@ -76,8 +77,6 @@ def post_memory(api_key: str, content: str, user_id: str, project_id: str, branc
 
     body = {
         "messages": [{"role": "user", "content": content}],
-        "user_id": user_id,
-        "app_id": project_id,
         "metadata": metadata,
         "infer": False,
     }
@@ -88,6 +87,7 @@ def post_memory(api_key: str, content: str, user_id: str, project_id: str, branc
         headers={
             "Content-Type": "application/json",
             "X-API-Key": api_key,
+            "Idempotency-Key": str(uuid.uuid4()),
         },
         method="POST",
     )
@@ -99,7 +99,7 @@ def post_memory(api_key: str, content: str, user_id: str, project_id: str, branc
         return False
 
 
-def import_chunks(chunks: list[str], api_key: str, user_id: str, project_id: str, branch: str, source: str, hash_key: str = "") -> int:
+def import_chunks(chunks: list[str], api_key: str, branch: str, source: str, hash_key: str = "") -> int:
     """Import a list of content chunks; return number of successful imports.
 
     Skips import if content hash matches a previous run for the same hash_key."""
@@ -116,7 +116,7 @@ def import_chunks(chunks: list[str], api_key: str, user_id: str, project_id: str
 
     success = 0
     for chunk in chunks:
-        if post_memory(api_key, chunk, user_id, project_id, branch, source):
+        if post_memory(api_key, chunk, branch, source):
             success += 1
 
     if success > 0 and hash_key and current_hash:
@@ -146,7 +146,6 @@ def cmd_cursorrules(args: list[str]) -> None:
     source = "cursor-import"
 
     api_key = resolve_api_key()
-    user_id = resolve_user_id()
     project_id = resolve_project_id()
     branch = resolve_branch()
 
@@ -167,7 +166,7 @@ def cmd_cursorrules(args: list[str]) -> None:
         raw_chunks = [content.strip()] if content.strip() else []
 
     chunks = filter_and_truncate(raw_chunks)
-    n = import_chunks(chunks, api_key, user_id, project_id, branch, source, hash_key=f"{project_id}:{source}:{path}")
+    n = import_chunks(chunks, api_key, branch, source, hash_key=f"{project_id}:{source}:{path}")
     print(f"Imported {n} memories from {source} ({path})")
 
 
@@ -176,7 +175,6 @@ def cmd_copilot(args: list[str]) -> None:
     source = "copilot-import"
 
     api_key = resolve_api_key()
-    user_id = resolve_user_id()
     project_id = resolve_project_id()
     branch = resolve_branch()
 
@@ -196,7 +194,7 @@ def cmd_copilot(args: list[str]) -> None:
         raw_chunks = [content.strip()] if content.strip() else []
 
     chunks = filter_and_truncate(raw_chunks)
-    n = import_chunks(chunks, api_key, user_id, project_id, branch, source, hash_key=f"{project_id}:{source}:{path}")
+    n = import_chunks(chunks, api_key, branch, source, hash_key=f"{project_id}:{source}:{path}")
     print(f"Imported {n} memories from {source} ({path})")
 
 
@@ -205,7 +203,6 @@ def cmd_cline(args: list[str]) -> None:
     source = "cline-import"
 
     api_key = resolve_api_key()
-    user_id = resolve_user_id()
     project_id = resolve_project_id()
     branch = resolve_branch()
 
@@ -232,7 +229,7 @@ def cmd_cline(args: list[str]) -> None:
         if not content:
             continue
         chunks = filter_and_truncate([content])
-        n = import_chunks(chunks, api_key, user_id, project_id, branch, source, hash_key=f"{project_id}:{source}:{filepath}")
+        n = import_chunks(chunks, api_key, branch, source, hash_key=f"{project_id}:{source}:{filepath}")
         total += n
 
     print(f"Imported {total} memories from {source} ({dir_path})")
@@ -243,7 +240,6 @@ def cmd_continue(args: list[str]) -> None:
     source = "continue-import"
 
     api_key = resolve_api_key()
-    user_id = resolve_user_id()
     project_id = resolve_project_id()
     branch = resolve_branch()
 
@@ -263,7 +259,7 @@ def cmd_continue(args: list[str]) -> None:
         raw_chunks = [content.strip()] if content.strip() else []
 
     chunks = filter_and_truncate(raw_chunks)
-    n = import_chunks(chunks, api_key, user_id, project_id, branch, source, hash_key=f"{project_id}:{source}:{path}")
+    n = import_chunks(chunks, api_key, branch, source, hash_key=f"{project_id}:{source}:{path}")
     print(f"Imported {n} memories from {source} ({path})")
 
 
