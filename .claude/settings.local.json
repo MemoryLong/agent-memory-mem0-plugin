@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_mem0_mem0__search_memory",
+      "mcp__plugin_mem0_mem0__add_memory"
+    ]
+  },
+  "enabledPlugins": {
+    "mem0@mem0-plugins": true
+  }
+}
