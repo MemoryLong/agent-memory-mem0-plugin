@@ -62,7 +62,7 @@ MEM0_API_KEY is not set. To configure:
 
 Optional overrides:
 - \`MEM0_BASE_URL\` (default \`http://localhost:18100\`) — memory REST API
-- \`MEM0_MCP_URL\` (default \`http://localhost:18101/v1/agent/mcp/memory/mcp\`) — MCP endpoint
+- \`MEM0_MCP_URL\` (default \`http://localhost:18100/v1/agent/mcp/memory/mcp\`) — MCP endpoint
 BANNER
   exit 0
 fi

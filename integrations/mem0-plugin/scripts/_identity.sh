@@ -55,7 +55,7 @@ export MEM0_BASE_URL
 if [ -z "${MEM0_MCP_URL:-}" ] && [ -n "${CLAUDE_PLUGIN_OPTION_MCP_URL:-}" ]; then
   MEM0_MCP_URL="$CLAUDE_PLUGIN_OPTION_MCP_URL"
 fi
-MEM0_MCP_URL="${MEM0_MCP_URL:-http://localhost:18101/v1/agent/mcp/memory/mcp}"
+MEM0_MCP_URL="${MEM0_MCP_URL:-http://localhost:18100/v1/agent/mcp/memory/mcp}"
 export MEM0_MCP_URL
 
 _mem0_resolve_identity() {
