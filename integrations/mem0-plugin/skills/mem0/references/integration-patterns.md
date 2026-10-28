@@ -36,9 +36,9 @@ prompt = ChatPromptTemplate.from_messages([
     HumanMessage(content="{input}")
 ])
 
-def retrieve_context(query: str, user_id: str):
+def retrieve_context(query: str):
     """Retrieve relevant memories from Mem0"""
-    memories = mem0.search(query, filters={"user_id": user_id})
+    memories = mem0.search(query)
     memory_list = memories['results']
     serialized = ' '.join([m["memory"] for m in memory_list])
     return [
@@ -46,16 +46,15 @@ def retrieve_context(query: str, user_id: str):
         {"role": "user", "content": query}
     ]
 
-def chat_turn(user_input: str, user_id: str) -> str:
+def chat_turn(user_input: str) -> str:
     # 1. Retrieve
-    context = retrieve_context(user_input, user_id)
+    context = retrieve_context(user_input)
     # 2. Generate
     chain = prompt | llm
     response = chain.invoke({"context": context, "input": user_input})
     # 3. Store
     mem0.add(
-        [{"role": "user", "content": user_input}, {"role": "assistant", "content": response.content}],
-        user_id=user_id
+        [{"role": "user", "content": user_input}, {"role": "assistant", "content": response.content}]
     )
     return response.content
 ```
@@ -80,7 +79,7 @@ messages = [
     {"role": "assistant", "content": "Noted! I'll recommend beach destinations."},
     {"role": "user", "content": "I like Airbnb more than hotels."},
 ]
-client.add(messages, user_id="crew_user_1")
+client.add(messages)
 
 # Create agent
 travel_agent = Agent(
@@ -105,7 +104,6 @@ crew = Crew(
     memory=True,
     memory_config={
         "provider": "mem0",
-        "config": {"user_id": "crew_user_1"},
     }
 )
 
@@ -128,7 +126,7 @@ import { createMem0 } from "@mem0/vercel-ai-provider";
 
 const mem0 = createMem0();
 const { text } = await generateText({
-    model: mem0("gpt-5-mini", { user_id: "borat" }),
+    model: mem0("gpt-5-mini"),
     prompt: "Suggest me a good car to buy!",
 });
 ```
@@ -148,17 +146,17 @@ from mem0 import MemoryClient
 mem0 = MemoryClient()
 
 @function_tool
-def search_memory(query: str, user_id: str) -> str:
+def search_memory(query: str) -> str:
     """Search through past conversations and memories"""
-    memories = mem0.search(query, filters={"user_id": user_id}, top_k=3)
+    memories = mem0.search(query, top_k=3)
     if memories and memories.get('results'):
         return "\n".join([f"- {mem['memory']}" for mem in memories['results']])
     return "No relevant memories found."
 
 @function_tool
-def save_memory(content: str, user_id: str) -> str:
+def save_memory(content: str) -> str:
     """Save important information to memory"""
-    mem0.add([{"role": "user", "content": content}], user_id=user_id)
+    mem0.add([{"role": "user", "content": content}])
     return "Information saved to memory."
 
 agent = Agent(
@@ -214,7 +212,6 @@ from pipecat.services.mem0 import Mem0MemoryService
 
 memory = Mem0MemoryService(
     api_key=os.getenv("MEM0_API_KEY"),
-    user_id="alice",
     agent_id="voice_bot",
     params={
         "search_limit": 10,
@@ -259,14 +256,12 @@ mem0 = MemoryClient()
 
 class State(TypedDict):
     messages: Annotated[List[HumanMessage | AIMessage], add_messages]
-    mem0_user_id: str
 
 def chatbot(state: State):
     messages = state["messages"]
-    user_id = state["mem0_user_id"]
 
     # Retrieve relevant memories
-    memories = mem0.search(messages[-1].content, filters={"user_id": user_id})
+    memories = mem0.search(messages[-1].content)
     context = "Relevant context:\n"
     for memory in memories["results"]:
         context += f"- {memory['memory']}\n"
@@ -279,8 +274,7 @@ def chatbot(state: State):
     # Store the interaction
     mem0.add(
         [{"role": "user", "content": messages[-1].content},
-         {"role": "assistant", "content": response.content}],
-        user_id=user_id
+         {"role": "assistant", "content": response.content}]
     )
     return {"messages": [response]}
 
@@ -291,8 +285,7 @@ app = graph.compile()
 
 # Usage
 result = app.invoke({
-    "messages": [HumanMessage(content="I need help with my order")],
-    "mem0_user_id": "customer_123"
+    "messages": [HumanMessage(content="I need help with my order")]
 })
 ```
 
@@ -309,7 +302,7 @@ LlamaIndex has native Mem0 support via `Mem0Memory`. Works with ReAct and Functi
 ```python
 from llama_index.memory.mem0 import Mem0Memory
 
-context = {"user_id": "alice", "agent_id": "llama_agent_1"}
+context = {"agent_id": "llama_agent_1"}
 memory = Mem0Memory.from_client(
     context=context,
     search_msg_limit=4,  # messages from chat history used for retrieval (default: 5)
@@ -348,7 +341,6 @@ from autogen import ConversableAgent
 from mem0 import MemoryClient
 
 memory_client = MemoryClient()
-USER_ID = "alice"
 
 agent = ConversableAgent(
     "chatbot",
@@ -359,7 +351,7 @@ agent = ConversableAgent(
 
 def get_context_aware_response(question: str) -> str:
     # Retrieve memories for context
-    relevant_memories = memory_client.search(question, filters={"user_id": USER_ID})
+    relevant_memories = memory_client.search(question)
     context = "\n".join([m["memory"] for m in relevant_memories.get("results", [])])
 
     prompt = f"""Answer considering previous interactions:
@@ -370,8 +362,7 @@ def get_context_aware_response(question: str) -> str:
 
     # Store the new interaction
     memory_client.add(
-        [{"role": "user", "content": question}, {"role": "assistant", "content": reply}],
-        user_id=USER_ID
+        [{"role": "user", "content": question}, {"role": "assistant", "content": reply}]
     )
     return reply
 ```

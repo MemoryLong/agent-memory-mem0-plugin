@@ -28,9 +28,9 @@ from openai import OpenAI
 mem0 = MemoryClient()
 openai_client = OpenAI()
 
-def chat(user_input: str, user_id: str) -> str:
+def chat(user_input: str) -> str:
     # 1. Retrieve relevant memories
-    memories = mem0.search(user_input, user_id=user_id)
+    memories = mem0.search(user_input)
     context = "\n".join([f"- {m['memory']}" for m in memories.get("results", [])])
 
     # 2. Generate response with memory context
@@ -49,15 +49,14 @@ Use these known facts about the user to personalize your response:
 
     # 3. Store interaction for future context
     mem0.add(
-        [{"role": "user", "content": user_input}, {"role": "assistant", "content": reply}],
-        user_id=user_id
+        [{"role": "user", "content": user_input}, {"role": "assistant", "content": reply}]
     )
     return reply
 
 # Usage
-chat("I want to run a marathon in under 4 hours", user_id="max")
+chat("I want to run a marathon in under 4 hours")
 # Next day, app restarted:
-chat("What should I focus on today?", user_id="max")
+chat("What should I focus on today?")
 # Ray remembers the sub-4 marathon goal
 ```
 
@@ -70,9 +69,9 @@ import OpenAI from 'openai';
 const mem0 = new MemoryClient({ apiKey: process.env.MEM0_API_KEY! });
 const openai = new OpenAI();
 
-async function chat(userInput: string, userId: string): Promise<string> {
+async function chat(userInput: string): Promise<string> {
     // 1. Retrieve relevant memories
-    const memories = await mem0.search(userInput, { filters: { user_id: userId } });
+    const memories = await mem0.search(userInput);
     const context = memories.results
         ?.map((m: any) => `- ${m.memory}`)
         .join('\n') || 'No prior context yet.';
@@ -89,8 +88,7 @@ async function chat(userInput: string, userId: string): Promise<string> {
 
     // 3. Store interaction
     await mem0.add(
-        [{ role: 'user', content: userInput }, { role: 'assistant', content: reply }],
-        { userId: userId }
+        [{ role: 'user', content: userInput }, { role: 'assistant', content: reply }]
     );
     return reply;
 }
@@ -127,40 +125,27 @@ custom_categories = [
 client.project.update(custom_categories=custom_categories)
 
 # 2. Store interactions — auto-classified into categories
-def log_support_interaction(user_id: str, message: str, priority: str = "normal"):
+def log_support_interaction(message: str, priority: str = "normal"):
     client.add(
         [{"role": "user", "content": message}],
-        user_id=user_id,
         metadata={"priority": priority, "source": "support_chat"}
     )
 
 # 3. Retrieve by category
-def get_billing_issues(user_id: str):
-    return client.get_all(
-        filters={
-            "AND": [
-                {"user_id": user_id},
-                {"categories": {"in": ["billing"]}}
-            ]
-        }
-    )
+def get_billing_issues():
+    return client.get_all(filters={"categories": {"in": ["billing"]}})
 
-def search_support_history(user_id: str, query: str):
+def search_support_history(query: str):
     return client.search(
         query,
-        filters={
-            "AND": [
-                {"user_id": user_id},
-                {"categories": {"contains": "support_tickets"}}
-            ]
-        },
+        filters={"categories": {"contains": "support_tickets"}},
         top_k=5
     )
 
 # Usage
-log_support_interaction("maria", "I was charged twice for last month's subscription", priority="high")
-log_support_interaction("maria", "The dashboard is loading slowly on mobile")
-billing = get_billing_issues("maria")  # Returns only billing-related memories
+log_support_interaction("I was charged twice for last month's subscription", priority="high")
+log_support_interaction("The dashboard is loading slowly on mobile")
+billing = get_billing_issues()  # Returns only billing-related memories
 ```
 
 ### Implementation (TypeScript)
@@ -179,17 +164,15 @@ await client.updateProject({
     ],
 });
 
-async function logInteraction(userId: string, message: string, priority = 'normal') {
+async function logInteraction(message: string, priority = 'normal') {
     await client.add(
         [{ role: 'user', content: message }],
-        { userId: userId, metadata: { priority, source: 'support_chat' } }
+        { metadata: { priority, source: 'support_chat' } }
     );
 }
 
-async function getBillingIssues(userId: string) {
-    return client.getAll({
-        filters: { AND: [{ user_id: userId }, { categories: { in: ['billing'] } }] },
-    });
+async function getBillingIssues() {
+    return client.getAll({ filters: { categories: { in: ['billing'] } } });
 }
 ```
 
@@ -216,17 +199,16 @@ from openai import OpenAI
 mem0 = MemoryClient()
 openai_client = OpenAI()
 
-def save_patient_info(user_id: str, information: str):
+def save_patient_info(information: str):
     mem0.add(
         [{"role": "user", "content": information}],
-        user_id=user_id,
         run_id="healthcare_session",
         metadata={"type": "patient_information"}
     )
 
-def consult(user_id: str, question: str) -> str:
+def consult(question: str) -> str:
     # High threshold for medical accuracy
-    memories = mem0.search(question, user_id=user_id, top_k=5, threshold=0.7)
+    memories = mem0.search(question, top_k=5, threshold=0.7)
     context = "\n".join([f"- {m['memory']}" for m in memories.get("results", [])])
 
     response = openai_client.chat.completions.create(
@@ -241,14 +223,13 @@ def consult(user_id: str, question: str) -> str:
     # Store the interaction
     mem0.add(
         [{"role": "user", "content": question}, {"role": "assistant", "content": reply}],
-        user_id=user_id,
         run_id="healthcare_session",
     )
     return reply
 
 # Usage
-save_patient_info("alex", "I'm allergic to penicillin and take metformin for type 2 diabetes")
-consult("alex", "Can I take amoxicillin for my sore throat?")
+save_patient_info("I'm allergic to penicillin and take metformin for type 2 diabetes")
+consult("Can I take amoxicillin for my sore throat?")
 # Remembers penicillin allergy — amoxicillin is a penicillin-type antibiotic
 ```
 
@@ -261,16 +242,15 @@ import OpenAI from 'openai';
 const mem0 = new MemoryClient({ apiKey: process.env.MEM0_API_KEY! });
 const openai = new OpenAI();
 
-async function savePatientInfo(userId: string, info: string) {
+async function savePatientInfo(info: string) {
     await mem0.add(
         [{ role: 'user', content: info }],
-        { userId: userId, runId: 'healthcare_session', metadata: { type: 'patient_information' } }
+        { runId: 'healthcare_session', metadata: { type: 'patient_information' } }
     );
 }
 
-async function consult(userId: string, question: string): Promise<string> {
+async function consult(question: string): Promise<string> {
     const memories = await mem0.search(question, {
-        filters: { user_id: userId },
         topK: 5,
         threshold: 0.7,
     });
@@ -287,7 +267,7 @@ async function consult(userId: string, question: string): Promise<string> {
 
     await mem0.add(
         [{ role: 'user', content: question }, { role: 'assistant', content: reply }],
-        { userId: userId, runId: 'healthcare_session' }
+        { runId: 'healthcare_session' }
     );
     return reply;
 }
@@ -316,19 +296,18 @@ from openai import OpenAI
 mem0 = MemoryClient()
 openai_client = OpenAI()
 
-def store_writing_preferences(user_id: str, preferences: str):
+def store_writing_preferences(preferences: str):
     mem0.add(
         [{"role": "user", "content": preferences}],
-        user_id=user_id,
         run_id="editing_session",
         metadata={"type": "preferences", "category": "writing_style"}
     )
 
-def draft_content(user_id: str, topic: str) -> str:
+def draft_content(topic: str) -> str:
     # Retrieve writing preferences
     prefs = mem0.search(
         "writing style preferences",
-        filters={"AND": [{"user_id": user_id}, {"run_id": "editing_session"}]}
+        filters={"run_id": "editing_session"}
     )
     style_context = "\n".join([f"- {m['memory']}" for m in prefs.get("results", [])])
 
@@ -342,8 +321,8 @@ def draft_content(user_id: str, topic: str) -> str:
     return response.choices[0].message.content
 
 # Usage
-store_writing_preferences("writer_01", "I prefer short sentences. Active voice. No jargon. Use analogies.")
-draft_content("writer_01", "Why AI memory matters for chatbots")
+store_writing_preferences("I prefer short sentences. Active voice. No jargon. Use analogies.")
+draft_content("Why AI memory matters for chatbots")
 # Drafts content matching the stored voice guidelines
 ```
 
@@ -356,16 +335,16 @@ import OpenAI from 'openai';
 const mem0 = new MemoryClient({ apiKey: process.env.MEM0_API_KEY! });
 const openai = new OpenAI();
 
-async function storePreferences(userId: string, preferences: string) {
+async function storePreferences(preferences: string) {
     await mem0.add(
         [{ role: 'user', content: preferences }],
-        { userId: userId, runId: 'editing_session', metadata: { type: 'preferences' } }
+        { runId: 'editing_session', metadata: { type: 'preferences' } }
     );
 }
 
-async function draftContent(userId: string, topic: string): Promise<string> {
+async function draftContent(topic: string): Promise<string> {
     const prefs = await mem0.search('writing style preferences', {
-        filters: { AND: [{ user_id: userId }, { run_id: 'editing_session' }] },
+        filters: { run_id: 'editing_session' },
     });
     const styleContext = prefs.results?.map((m: any) => `- ${m.memory}`).join('\n') || '';
 
@@ -392,7 +371,7 @@ async function draftContent(userId: string, topic: string): Promise<string> {
 
 ## 5. Multi-Agent / Multi-Tenant
 
-Keep memories separate using `user_id`, `agent_id`, `app_id`, and `run_id` scoping. Critical for multi-agent workflows and multi-tenant apps.
+Keep memories separate using `agent_id`, `app_id`, and `run_id` scoping. Critical for multi-agent workflows and multi-tenant apps.
 
 ### Implementation (Python)
 
@@ -401,32 +380,17 @@ from mem0 import MemoryClient
 
 client = MemoryClient()
 
-# Store memories scoped to user + agent + session
-def store_scoped_memory(messages: list, user_id: str, agent_id: str, run_id: str, app_id: str):
+# Store memories scoped to agent + session + app
+def store_scoped_memory(messages: list, agent_id: str, run_id: str, app_id: str):
     client.add(
         messages,
-        user_id=user_id,
         agent_id=agent_id,
         run_id=run_id,
         app_id=app_id
     )
 
-# Query within a specific scope
-def search_user_session(query: str, user_id: str, app_id: str, run_id: str):
-    """Search memories for a specific user within a specific session."""
-    return client.search(
-        query,
-        filters={
-            "AND": [
-                {"user_id": user_id},
-                {"app_id": app_id},
-                {"run_id": run_id}
-            ]
-        }
-    )
-
 def search_agent_knowledge(query: str, agent_id: str, app_id: str):
-    """Search all memories an agent has across all users."""
+    """Search all memories an agent has."""
     return client.search(
         query,
         filters={
@@ -440,16 +404,12 @@ def search_agent_knowledge(query: str, agent_id: str, app_id: str):
 # Usage: Travel concierge app with multiple agents
 store_scoped_memory(
     [{"role": "user", "content": "I'm vegetarian and prefer window seats"}],
-    user_id="traveler_cam",
     agent_id="travel_planner",
     run_id="tokyo-2025",
     app_id="concierge_app"
 )
 
-# User-scoped query: "What does Cam prefer?"
-user_mems = search_user_session("dietary restrictions?", "traveler_cam", "concierge_app", "tokyo-2025")
-
-# Agent-scoped query: "What do all travelers prefer?" (across users)
+# Agent-scoped query: "What are common dietary preferences?"
 agent_mems = search_agent_knowledge("common dietary restrictions?", "travel_planner", "concierge_app")
 ```
 
@@ -462,19 +422,12 @@ const client = new MemoryClient({ apiKey: process.env.MEM0_API_KEY! });
 
 async function storeScopedMemory(
     messages: Array<{ role: string; content: string }>,
-    userId: string, agentId: string, runId: string, appId: string
+    agentId: string, runId: string, appId: string
 ) {
     await client.add(messages, {
-        userId: userId,
         agentId: agentId,
         runId: runId,
         appId: appId,
-    });
-}
-
-async function searchUserSession(query: string, userId: string, appId: string, runId: string) {
-    return client.search(query, {
-        filters: { AND: [{ user_id: userId }, { app_id: appId }, { run_id: runId }] },
     });
 }
 
@@ -487,8 +440,8 @@ async function searchAgentKnowledge(query: string, agentId: string, appId: strin
 
 ### Key Benefits
 
-- Full isolation between users, agents, sessions, and apps
-- Query at any scope level — user, agent, session, or app-wide
+- Full isolation between agents, sessions, and apps
+- Query at any scope level — agent, session, or app-wide
 - No memory leakage between tenants
 
 **Best for:** Multi-agent workflows, multi-tenant SaaS — proper isolation at every level.
@@ -514,9 +467,9 @@ mem0.project.update(
 Extract dietary preferences, location, interests, and purchase history."""
 )
 
-def personalized_search(user_id: str, query: str, search_results: list) -> str:
+def personalized_search(query: str, search_results: list) -> str:
     # Get user context from memory
-    memories = mem0.search(query, user_id=user_id, top_k=5)
+    memories = mem0.search(query, top_k=5)
     user_context = "\n".join([f"- {m['memory']}" for m in memories.get("results", [])])
 
     response = openai_client.chat.completions.create(
@@ -529,14 +482,11 @@ def personalized_search(user_id: str, query: str, search_results: list) -> str:
     reply = response.choices[0].message.content
 
     # Store the query to learn preferences over time
-    mem0.add(
-        [{"role": "user", "content": query}],
-        user_id=user_id
-    )
+    mem0.add([{"role": "user", "content": query}])
     return reply
 
 # Usage
-personalized_search("user_42", "best restaurants nearby", ["Restaurant A", "Restaurant B"])
+personalized_search("best restaurants nearby", ["Restaurant A", "Restaurant B"])
 # Over time, Mem0 learns: "user prefers vegetarian, lives in Austin"
 # Future searches are automatically personalized
 ```
@@ -550,8 +500,8 @@ import OpenAI from 'openai';
 const mem0 = new MemoryClient({ apiKey: process.env.MEM0_API_KEY! });
 const openai = new OpenAI();
 
-async function personalizedSearch(userId: string, query: string, searchResults: string[]): Promise<string> {
-    const memories = await mem0.search(query, { filters: { user_id: userId }, topK: 5 });
+async function personalizedSearch(query: string, searchResults: string[]): Promise<string> {
+    const memories = await mem0.search(query, { topK: 5 });
     const context = memories.results?.map((m: any) => `- ${m.memory}`).join('\n') || '';
 
     const response = await openai.chat.completions.create({
@@ -563,7 +513,7 @@ async function personalizedSearch(userId: string, query: string, searchResults: 
     });
     const reply = response.choices[0].message.content!;
 
-    await mem0.add([{ role: 'user', content: query }], { userId: userId });
+    await mem0.add([{ role: 'user', content: query }]);
     return reply;
 }
 ```
@@ -589,36 +539,28 @@ from mem0 import MemoryClient
 
 client = MemoryClient()
 
-def store_email(user_id: str, sender: str, subject: str, body: str, date: str):
+def store_email(sender: str, subject: str, body: str, date: str):
     client.add(
         [{"role": "user", "content": f"Email from {sender}: {subject}\n\n{body}"}],
-        user_id=user_id,
         metadata={"email_type": "incoming", "sender": sender, "subject": subject, "date": date}
     )
 
-def search_emails(user_id: str, query: str):
+def search_emails(query: str):
     return client.search(
         query,
-        filters={"AND": [{"user_id": user_id}, {"categories": {"contains": "email"}}]},
+        filters={"categories": {"contains": "email"}},
         top_k=10
     )
 
-def get_emails_from_sender(user_id: str, sender: str):
-    return client.get_all(
-        filters={
-            "AND": [
-                {"user_id": user_id},
-                {"metadata": {"contains": sender}}
-            ]
-        }
-    )
+def get_emails_from_sender(sender: str):
+    return client.get_all(filters={"metadata": {"contains": sender}})
 
 # Usage
-store_email("alice", "bob@acme.com", "Q3 Budget Review", "Attached is the Q3 budget...", "2025-01-15")
-store_email("alice", "carol@acme.com", "Sprint Planning", "Here are the priorities...", "2025-01-16")
+store_email("bob@acme.com", "Q3 Budget Review", "Attached is the Q3 budget...", "2025-01-15")
+store_email("carol@acme.com", "Sprint Planning", "Here are the priorities...", "2025-01-16")
 
-results = search_emails("alice", "budget discussions")
-sender_emails = get_emails_from_sender("alice", "bob@acme.com")
+results = search_emails("budget discussions")
+sender_emails = get_emails_from_sender("bob@acme.com")
 ```
 
 ### Implementation (TypeScript)
@@ -628,16 +570,16 @@ import MemoryClient from 'mem0ai';
 
 const client = new MemoryClient({ apiKey: process.env.MEM0_API_KEY! });
 
-async function storeEmail(userId: string, sender: string, subject: string, body: string, date: string) {
+async function storeEmail(sender: string, subject: string, body: string, date: string) {
     await client.add(
         [{ role: 'user', content: `Email from ${sender}: ${subject}\n\n${body}` }],
-        { userId: userId, metadata: { email_type: 'incoming', sender, subject, date } }
+        { metadata: { email_type: 'incoming', sender, subject, date } }
     );
 }
 
-async function searchEmails(userId: string, query: string) {
+async function searchEmails(query: string) {
     return client.search(query, {
-        filters: { AND: [{ user_id: userId }, { categories: { contains: 'email' } }] },
+        filters: { categories: { contains: 'email' } },
         topK: 10,
     });
 }
@@ -661,7 +603,7 @@ Every use case follows the same 3-step loop:
 
 ```python
 # 1. Retrieve relevant context
-memories = mem0.search(user_input, user_id=user_id)
+memories = mem0.search(user_input)
 context = "\n".join([m["memory"] for m in memories.get("results", [])])
 
 # 2. Generate with context
@@ -669,21 +611,17 @@ response = llm.generate(system_prompt=f"Context:\n{context}", user_input=user_in
 
 # 3. Store the interaction
 mem0.add(
-    [{"role": "user", "content": user_input}, {"role": "assistant", "content": response}],
-    user_id=user_id
+    [{"role": "user", "content": user_input}, {"role": "assistant", "content": response}]
 )
 ```
 
 ### Pattern 2: Scope with Entity Identifiers
 
-Use `user_id`, `agent_id`, `app_id`, and `run_id` to isolate memories:
+Use `agent_id`, `app_id`, and `run_id` to isolate memories:
 
 ```python
-# User-level: personal preferences
-client.add(messages, user_id="alice")
-
 # Session-level: conversation within one session
-client.add(messages, user_id="alice", run_id="session_123")
+client.add(messages, run_id="session_123")
 
 # Agent-level: agent-specific knowledge
 client.add(messages, agent_id="support_bot", app_id="helpdesk")
@@ -695,12 +633,10 @@ Attach structured metadata for multi-dimensional queries:
 
 ```python
 # Store with metadata
-client.add(messages, user_id="alice", metadata={"priority": "high", "source": "phone_call"})
+client.add(messages, metadata={"priority": "high", "source": "phone_call"})
 
-# Filter by category + metadata
-client.search("billing issues", filters={
-    "AND": [{"user_id": "alice"}, {"categories": {"contains": "billing"}}]
-})
+# Filter by category
+client.search("billing issues", filters={"categories": {"contains": "billing"}})
 ```
 
 ### Pattern 4: Custom Instructions for Domain-Specific Extraction

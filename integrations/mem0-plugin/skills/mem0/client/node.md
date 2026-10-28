@@ -41,13 +41,12 @@ const messages = [
     { role: 'user', content: "I'm a vegetarian and allergic to nuts." },
     { role: 'assistant', content: "Got it! I'll remember that." },
 ];
-await client.add(messages, { userId: 'alice' });
+await client.add(messages);
 ```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `messages` | `Message[]` | Array of `{role, content}` objects |
-| `options.userId` | string | User identifier |
 | `options.agentId` | string | Agent identifier |
 | `options.appId` | string | Application identifier |
 | `options.runId` | string | Session identifier |
@@ -61,7 +60,7 @@ await client.add(messages, { userId: 'alice' });
 Search memories by semantic similarity.
 
 ```typescript
-const results = await client.search('dietary preferences', { filters: { user_id: 'alice' }, topK: 20 });
+const results = await client.search('dietary preferences', { topK: 20 });
 for (const mem of results.results) {
     console.log(mem.memory, mem.score);
 }
@@ -70,7 +69,7 @@ for (const mem of results.results) {
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `query` | string | Natural language search query |
-| `options.filters` | object | Filter object with entity IDs (`user_id`, `agent_id`, etc.) and/or `AND`/`OR`/`NOT` conditions |
+| `options.filters` | object | Filter object with entity IDs (`agent_id`, etc.) and/or `AND`/`OR`/`NOT` conditions |
 | `options.topK` | number | Number of results (default: 20) |
 | `options.rerank` | boolean | Enable semantic reranking (default: false) |
 | `options.threshold` | number | Minimum similarity (default: 0.1) |
@@ -85,19 +84,19 @@ const memory = await client.get('ea925981-...');
 
 #### getAll(options?)
 
-Retrieve all memories. Requires at least one entity identifier in filters.
+Retrieve all memories. Filters are optional — ownership comes from the API key.
 
 ```typescript
-const memories = await client.getAll({ filters: { user_id: 'alice' } });
+const memories = await client.getAll();
 // With filters
 const filtered = await client.getAll({
-    filters: { AND: [{ user_id: 'alice' }, { categories: { contains: 'health' } }] },
+    filters: { categories: { contains: 'health' } },
 });
 ```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `options.filters` | object | Filter object with entity IDs (`user_id`, `agent_id`, etc.) and/or `AND`/`OR`/`NOT` conditions |
+| `options.filters` | object | Filter object with entity IDs (`agent_id`, etc.) and/or `AND`/`OR`/`NOT` conditions |
 | `options.page` | number | Page number |
 | `options.pageSize` | number | Results per page |
 
@@ -123,8 +122,10 @@ await client.delete('ea925981-...');
 
 #### deleteAll(options?)
 
+Irreversible. With no options it deletes every memory visible to the API key.
+
 ```typescript
-await client.deleteAll({ userId: 'alice' });
+await client.deleteAll();
 ```
 
 #### history(memoryId)
@@ -164,11 +165,10 @@ const users = await client.users();
 // Returns: {results: [{type: "user", name: "alice"}, ...]}
 ```
 
-#### deleteUser(data) / deleteUsers(data)
+#### deleteUsers(data)
 
 ```typescript
-await client.deleteUser({ userId: 'alice' });  // Single entity
-await client.deleteUsers({ agentId: 'bot-1' }); // Flexible
+await client.deleteUsers({ agentId: 'bot-1' });
 ```
 
 ---
@@ -232,7 +232,6 @@ await client.feedback({
 ```typescript
 const exportReq = await client.createMemoryExport({
     schema: JSON.stringify({ type: 'object', properties: { name: { type: 'string' } } }),
-    filters: { user_id: 'alice' },
 });
 
 const result = await client.getMemoryExport({ memoryExportId: exportReq.id });
@@ -374,7 +373,7 @@ await m.reset();
 | **Auth** | API key required (`MEM0_API_KEY`) | No API key -- config-based |
 | **Execution** | API calls to `api.mem0.ai` | Local execution |
 | **Infrastructure** | Fully managed | Self-managed vector DB, embedder, LLM |
-| **Param style** | Top-level: `camelCase` (`userId`, `topK`), filter keys: `snake_case` (`user_id`) | Top-level: `camelCase` (`userId`, `topK`), filter keys: `snake_case` (`user_id`) |
+| **Param style** | Top-level: `camelCase` (`topK`), filter keys: `snake_case` | Top-level: `camelCase` (`userId`, `topK`), filter keys: `snake_case` (`user_id`) |
 | **Batch ops** | `batchUpdate`, `batchDelete` | Not available |
 | **Webhooks** | Full CRUD | Not available |
 | **Export** | `createMemoryExport` | Not available |
@@ -394,14 +393,7 @@ If you're using SDK v2.x:
 - Filter keys use snake_case: `user_id`, `agent_id`
 - OSS: `limit` renamed to `topK`
 
-**API Changes:**
-```typescript
-// v2 - top-level entity IDs, snake_case
-await client.search("query", { user_id: "alice", top_k: 20 });
-
-// v3 - filters object with snake_case keys, camelCase top-level params
-await client.search("query", { filters: { user_id: "alice" }, topK: 20 });
-```
+**API Changes:** v2 passed entity IDs as top-level options; v3 takes them inside `filters`.
 
 **Default Changes:**
 | Param | v2 | v3 |

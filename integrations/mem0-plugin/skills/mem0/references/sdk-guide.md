@@ -36,16 +36,16 @@ messages = [
     {"role": "user", "content": "I'm a vegetarian and allergic to nuts."},
     {"role": "assistant", "content": "Got it! I'll remember that."}
 ]
-client.add(messages, user_id="alice")
+client.add(messages)
 
 # With metadata
-client.add(messages, user_id="alice", metadata={"source": "onboarding"})
+client.add(messages, metadata={"source": "onboarding"})
 ```
 
 **TypeScript:**
 ```typescript
-await client.add(messages, { userId: "alice" });
-await client.add(messages, { userId: "alice", metadata: { source: "onboarding" } });
+await client.add(messages);
+await client.add(messages, { metadata: { source: "onboarding" } });
 ```
 
 ### Parameters
@@ -53,7 +53,6 @@ await client.add(messages, { userId: "alice", metadata: { source: "onboarding" }
 | Name | Type | Description |
 |------|------|-------------|
 | `messages` | array | `[{"role": "user", "content": "..."}]` |
-| `user_id` | string | User identifier (recommended) |
 | `agent_id` | string | Agent identifier |
 | `run_id` | string | Session identifier |
 | `metadata` | object | Custom key-value pairs |
@@ -63,12 +62,11 @@ await client.add(messages, { userId: "alice", metadata: { source: "onboarding" }
 
 ```python
 # Agent + session scoping
-client.add(messages, user_id="alice", agent_id="nutrition-agent", run_id="session-456")
+client.add(messages, agent_id="nutrition-agent", run_id="session-456")
 
 # Raw text -- skip LLM inference
 client.add(
     [{"role": "user", "content": "User prefers dark mode."}],
-    user_id="alice",
     infer=False,
 )
 ```
@@ -79,12 +77,12 @@ client.add(
 
 **Python:**
 ```python
-results = client.search("dietary preferences?", filters={"user_id": "alice"})
+results = client.search("dietary preferences?")
 
 # With filters and reranking
 results = client.search(
     query="work experience",
-    filters={"AND": [{"user_id": "alice"}, {"categories": {"contains": "professional_details"}}]},
+    filters={"categories": {"contains": "professional_details"}},
     top_k=5,
     rerank=True,
     threshold=0.5
@@ -93,9 +91,9 @@ results = client.search(
 
 **TypeScript:**
 ```typescript
-const results = await client.search("dietary preferences", { filters: { user_id: "alice" } });
+const results = await client.search("dietary preferences");
 const results = await client.search("work experience", {
-    filters: { AND: [{ user_id: "alice" }, { categories: { contains: "professional_details" } }] },
+    filters: { categories: { contains: "professional_details" } },
     topK: 5,
     rerank: true,
 });
@@ -103,46 +101,41 @@ const results = await client.search("work experience", {
 
 ### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `query` | string | Natural language search query |
-| `filters` | object | Filter object (AND/OR operators). Use `{"user_id": "..."}` to filter by user |
-| `top_k` | number | Number of results (default: 10 for Platform) |
+| Name | Type | Description                                              |
+|------|------|----------------------------------------------------------|
+| `query` | string | Natural language search query                            |
+| `filters` | object | Filter object (AND/OR operators).                        |
+| `top_k` | number | Number of results (default: 10 for Platform)             |
 | `rerank` | boolean | Enable reranking for better relevance (default: `false`) |
-| `threshold` | number | Minimum similarity score (default: 0.1) |
+| `threshold` | number | Minimum similarity score (default: 0.1)                  |
 
 ### Common Filter Patterns
 
 **Python:**
 ```python
-# Single user filter
-filters={"user_id": "alice"}
-
-# OR across agents
-filters={"OR": [{"user_id": "alice"}, {"agent_id": {"in": ["travel-agent", "sports-agent"]}}]}
+# Match a set of agents
+filters={"agent_id": {"in": ["travel-agent", "sports-agent"]}}
 
 # Category filtering (partial match)
-filters={"AND": [{"user_id": "alice"}, {"categories": {"contains": "finance"}}]}
+filters={"categories": {"contains": "finance"}}
 
 # Category filtering (exact match)
-filters={"AND": [{"user_id": "alice"}, {"categories": {"in": ["personal_information"]}}]}
+filters={"categories": {"in": ["personal_information"]}}
 
 # Wildcard (match any non-null run)
-filters={"AND": [{"user_id": "alice"}, {"run_id": "*"}]}
+filters={"run_id": "*"}
 
 # Date range
 filters={"AND": [
-    {"user_id": "alice"},
     {"created_at": {"gte": "2024-01-01T00:00:00Z"}},
     {"created_at": {"lt": "2024-02-01T00:00:00Z"}}
 ]}
 
 # Exclude categories with NOT
-filters={"AND": [{"user_id": "user_123"}, {"NOT": {"categories": {"in": ["spam", "test"]}}}]}
+filters={"NOT": {"categories": {"in": ["spam", "test"]}}}
 
 # Multi-dimensional query
 filters={"AND": [
-    {"user_id": "user_123"},
     {"keywords": {"icontains": "invoice"}},
     {"categories": {"in": ["finance"]}},
     {"created_at": {"gte": "2024-01-01T00:00:00Z"}}
@@ -151,17 +144,14 @@ filters={"AND": [
 
 **TypeScript:**
 ```typescript
-// Single user filter
-filters: { user_id: "alice" }
-
-// OR across agents
-filters: { OR: [{ user_id: "alice" }, { agent_id: { in: ["travel-agent", "sports-agent"] } }] }
+// Match a set of agents
+filters: { agent_id: { in: ["travel-agent", "sports-agent"] } }
 
 // Category filtering (partial match)
-filters: { AND: [{ user_id: "alice" }, { categories: { contains: "finance" } }] }
+filters: { categories: { contains: "finance" } }
 
 // Category filtering (exact match)
-filters: { AND: [{ user_id: "alice" }, { categories: { in: ["personal_information"] } }] }
+filters: { categories: { in: ["personal_information"] } }
 ```
 
 ---
@@ -173,25 +163,22 @@ filters: { AND: [{ user_id: "alice" }, { categories: { in: ["personal_informatio
 # Single memory by ID
 memory = client.get(memory_id="ea925981-...")
 
-# All memories for a user
-memories = client.get_all(filters={"user_id": "alice"})
+# Every memory visible to the API key
+memories = client.get_all()
 
 # With date range
 memories = client.get_all(
-    filters={"AND": [
-        {"user_id": "alex"},
-        {"created_at": {"gte": "2024-07-01", "lte": "2024-07-31"}}
-    ]}
+    filters={"created_at": {"gte": "2024-07-01", "lte": "2024-07-31"}}
 )
 ```
 
 **TypeScript:**
 ```typescript
 const memory = await client.get("ea925981-...");
-const memories = await client.getAll({ filters: { user_id: "alice" } });
+const memories = await client.getAll();
 ```
 
-**Note:** `get_all` requires at least one of `user_id`, `agent_id`, `app_id`, or `run_id` in filters.
+**Note:** filters are optional -- ownership comes from the API key. Add `agent_id`, `app_id`, or `run_id` to narrow the result.
 
 ---
 
@@ -215,13 +202,14 @@ await client.update("ea925981-...", { text: "Updated: vegan since 2024" });
 **Python:**
 ```python
 client.delete(memory_id="ea925981-...")
-client.delete_all(user_id="alice")  # Irreversible bulk delete
+client.delete_all()  # Irreversible: every memory visible to the API key
+client.delete_all(run_id="session-456")  # Narrower: only that session, still irreversible
 ```
 
 **TypeScript:**
 ```typescript
 await client.delete("ea925981-...");
-await client.deleteAll({ userId: "alice" });
+await client.deleteAll();
 ```
 
 ---
@@ -262,22 +250,15 @@ await client.batchDelete(["uuid-1", "uuid-2", "uuid-3"]);
 # List all users/agents/sessions with memories
 users = client.users()
 
-# Delete a user/agent entity
-client.delete_users(user_id="alice")
-
 # Submit feedback on a memory
 client.feedback(memory_id="...", feedback="POSITIVE", feedback_reason="Accurate extraction")
-
-# Export memories
-export = client.create_memory_export(filters={"AND": [{"user_id": "alice"}]})
-data = client.get_memory_export(memory_export_id=export["id"])
 ```
 
 ---
 
 ## Common Pitfalls
 
-1. **Entity cross-filtering fails silently** -- `AND` with `user_id` + `agent_id` returns empty. Use `OR`.
+1. **`user_id` and `env` are not filter dimensions** -- ownership comes from the API key: `env` is always refused, and `user_id` is refused unless it names the key's own user.
 2. **SQL operators rejected** -- use `gte`, `lt`, etc. Not `>=`, `<`.
 3. **Metadata filtering is limited** -- only top-level keys with `eq`, `contains`, `ne`.
 4. **Wildcard `*` excludes null** -- only matches non-null values.
@@ -286,7 +267,7 @@ data = client.get_memory_export(memory_export_id=export["id"])
 
 ## Naming Conventions
 
-Python uses `snake_case` everywhere (`user_id`, `memory_id`, `get_all`). TypeScript uses `camelCase` for methods (`getAll`, `deleteAll`, `batchUpdate`) and top-level parameters (`userId`, `topK`, `pageSize`), but filter keys use `snake_case` (`user_id`, `agent_id`).
+Python uses `snake_case` everywhere (`memory_id`, `get_all`). TypeScript uses `camelCase` for methods (`getAll`, `deleteAll`, `batchUpdate`) and top-level parameters (`topK`, `pageSize`), but filter keys use `snake_case` (`agent_id`).
 
 ---
 
@@ -296,27 +277,7 @@ Python uses `snake_case` everywhere (`user_id`, `memory_id`, `get_all`). TypeScr
 
 **1. Entity IDs in search() and getAll()**
 
-v3 requires entity IDs (`user_id`, `agent_id`, `run_id`) inside `filters` instead of as top-level parameters:
-
-```python
-# v2 (deprecated)
-client.search("query", user_id="alice")
-client.get_all(user_id="alice")
-
-# v3
-client.search("query", filters={"user_id": "alice"})
-client.get_all(filters={"user_id": "alice"})
-```
-
-```typescript
-// v2 (deprecated)
-await client.search("query", { user_id: "alice" });
-await client.getAll({ user_id: "alice" });
-
-// v3
-await client.search("query", { filters: { user_id: "alice" } });
-await client.getAll({ filters: { user_id: "alice" } });
-```
+v3 requires entity IDs (`agent_id`, `run_id`) inside `filters` instead of as top-level parameters.
 
 **2. TypeScript Parameter Naming**
 
@@ -324,7 +285,6 @@ v3 TypeScript uses camelCase for all parameters:
 
 | v2 | v3 |
 |----|-----|
-| `user_id` | `userId` |
 | `agent_id` | `agentId` |
 | `run_id` | `runId` |
 | `top_k` | `topK` |

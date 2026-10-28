@@ -24,10 +24,10 @@ messages = [
     {"role": "user", "content": "I'm a vegetarian and allergic to nuts."},
     {"role": "assistant", "content": "Got it! I'll remember your dietary preferences."}
 ]
-client.add(messages, user_id="user123")
+client.add(messages)
 
 # Search memories
-results = client.search("What are my dietary restrictions?", filters={"user_id": "user123"})
+results = client.search("What are my dietary restrictions?")
 print(results)
 ```
 
@@ -38,8 +38,8 @@ from mem0 import AsyncMemoryClient
 
 client = AsyncMemoryClient(api_key="your-api-key")
 
-await client.add(messages, user_id="user123")
-results = await client.search("query", filters={"user_id": "user123"})
+await client.add(messages)
+results = await client.search("query")
 ```
 
 ## TypeScript / JavaScript Setup
@@ -59,12 +59,10 @@ const messages = [
     {"role": "user", "content": "I'm a vegetarian and allergic to nuts."},
     {"role": "assistant", "content": "Got it! I'll remember your dietary preferences."}
 ];
-await client.add(messages, { userId: "user123" });
+await client.add(messages);
 
 // Search memories
-const results = await client.search("What are my dietary restrictions?", {
-    filters: { user_id: "user123" }
-});
+const results = await client.search("What are my dietary restrictions?");
 console.log(results);
 ```
 
@@ -81,8 +79,7 @@ curl -X POST https://api.mem0.ai/v3/memories/add/ \
     "messages": [
       {"role": "user", "content": "I am a vegetarian and allergic to nuts."},
       {"role": "assistant", "content": "Got it! I will remember your dietary preferences."}
-    ],
-    "user_id": "user123"
+    ]
   }'
 
 # Search memories
@@ -90,8 +87,7 @@ curl -X POST https://api.mem0.ai/v3/memories/search/ \
   -H "Authorization: Token $MEM0_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "What are my dietary restrictions?",
-    "filters": {"user_id": "user123"}
+    "query": "What are my dietary restrictions?"
   }'
 ```
 

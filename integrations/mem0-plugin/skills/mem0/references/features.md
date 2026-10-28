@@ -36,15 +36,12 @@ Deep semantic reordering of results — most relevant first.
 
 **Python:**
 ```python
-results = client.search(query, filters={"user_id": "user123"}, rerank=True)
+results = client.search(query, rerank=True)
 ```
 
 **TypeScript:**
 ```typescript
-const results = await client.search(query, {
-    filters: { user_id: 'user123' },
-    rerank: true,
-});
+const results = await client.search(query, { rerank: true });
 ```
 
 ---
@@ -103,11 +100,11 @@ categories = client.project.get(fields=["custom_categories"])
 
 **Override categories for a single add call:**
 ```python
-client.add(messages, user_id="alice", custom_categories=per_call_categories)
+client.add(messages, custom_categories=per_call_categories)
 ```
 
 ```javascript
-await client.add(messages, { userId: "alice", customCategories: perCallCategories });
+await client.add(messages, { customCategories: perCallCategories });
 ```
 
 ### Resolution Order
@@ -224,7 +221,6 @@ schema = {
 # Create export
 response = client.create_memory_export(
     schema=json.dumps(schema),
-    filters={"user_id": "alice"},
     export_instructions="Create comprehensive profile based on all memories"
 )
 
@@ -252,10 +248,8 @@ messages = [
 # Mem0 automatically attributes memories to each speaker
 response = client.add(messages, run_id="team_meeting_1")
 
-# Retrieve Alice's memories from that session
-alice_mems = client.get_all(
-    filters={"AND": [{"user_id": "alice"}, {"run_id": "team_meeting_1"}]}
-)
+# Retrieve memories from that session
+session_mems = client.get_all(filters={"run_id": "team_meeting_1"})
 ```
 
 Use the `name` field in messages to identify speakers. Mem0 maps names to entity scopes automatically.
@@ -365,7 +359,7 @@ image_message = {
         "image_url": {"url": "https://example.com/image.jpg"}
     }
 }
-client.add([image_message], user_id="alice")
+client.add([image_message])
 ```
 
 ### Image via Base64
@@ -382,7 +376,7 @@ image_message = {
         "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
     }
 }
-client.add([image_message], user_id="alice")
+client.add([image_message])
 ```
 
 ### Document (MDX/TXT)
@@ -392,7 +386,7 @@ doc_message = {
     "role": "user",
     "content": {"type": "mdx_url", "mdx_url": {"url": document_url}}
 }
-client.add([doc_message], user_id="alice")
+client.add([doc_message])
 ```
 
 ### PDF Document
@@ -402,5 +396,5 @@ pdf_message = {
     "role": "user",
     "content": {"type": "pdf_url", "pdf_url": {"url": pdf_url}}
 }
-client.add([pdf_message], user_id="alice")
+client.add([pdf_message])
 ```

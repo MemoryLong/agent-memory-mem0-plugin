@@ -52,6 +52,8 @@ const client = new MemoryClient({ apiKey: 'm0-xxx' });
 
 For async Python, use `AsyncMemoryClient`.
 
+**Identity is not a client parameter.** The backend resolves the user from the API key, so never pass `user_id` (or `userId`): a top-level value is discarded, and a `user_id` filter is refused unless it names the key's own user. `env` filters are always refused.
+
 ## Step 3: Core operations
 
 Every Mem0 integration follows the same pattern: **retrieve → generate → store**.
@@ -62,19 +64,19 @@ messages = [
     {"role": "user", "content": "I'm a vegetarian and allergic to nuts."},
     {"role": "assistant", "content": "Got it! I'll remember that."}
 ]
-client.add(messages, user_id="alice")
+client.add(messages)
 ```
 
 ### Search memories
 ```python
-results = client.search("dietary preferences", filters={"user_id": "alice"})
+results = client.search("dietary preferences")
 for mem in results.get("results", []):
     print(mem["memory"])
 ```
 
 ### Get all memories
 ```python
-all_memories = client.get_all(filters={"user_id": "alice"})
+all_memories = client.get_all()
 ```
 
 ### Update a memory
@@ -85,7 +87,7 @@ client.update("memory-uuid", text="Updated: vegetarian, nut allergy, prefers org
 ### Delete a memory
 ```python
 client.delete("memory-uuid")
-client.delete_all(user_id="alice")  # delete all for a user
+client.delete_all()  # deletes every memory visible to the API key
 ```
 
 ## Common integration pattern
@@ -97,9 +99,9 @@ from openai import OpenAI
 mem0 = MemoryClient()
 openai = OpenAI()
 
-def chat(user_input: str, user_id: str) -> str:
+def chat(user_input: str) -> str:
     # 1. Retrieve relevant memories
-    memories = mem0.search(user_input, filters={"user_id": user_id})
+    memories = mem0.search(user_input)
     context = "\n".join([m["memory"] for m in memories.get("results", [])])
 
     # 2. Generate response with memory context
@@ -114,18 +116,15 @@ def chat(user_input: str, user_id: str) -> str:
 
     # 3. Store interaction for future context
     mem0.add(
-        [{"role": "user", "content": user_input}, {"role": "assistant", "content": reply}],
-        user_id=user_id
+        [{"role": "user", "content": user_input}, {"role": "assistant", "content": reply}]
     )
     return reply
 ```
 
 ## Common edge cases
 
-- **Search returns empty:** v3 processes `add()` asynchronously — returns an event ID immediately. Wait 2-3s before searching. Also verify `user_id` matches exactly (case-sensitive) and use `filters={"user_id": "..."}` syntax.
-- **AND filter with user_id + agent_id returns empty:** Entities are stored separately. `{"AND": [{"user_id": "alice"}, {"agent_id": "bot"}]}` returns nothing. Use `OR` instead, or query each separately.
+- **Search returns empty:** v3 processes `add()` asynchronously — returns an event ID immediately. Wait 2-3s before searching.
 - **Duplicate memories:** Don't mix `infer=True` (default) and `infer=False` for the same data. `infer=True` extracts facts via LLM with dedup. `infer=False` stores raw — same text can be stored twice.
-- **Implicit null scoping:** `filters={"user_id": "alice"}` only returns memories where `agent_id`, `app_id`, `run_id` are ALL null. Wrap in `{"OR": [...]}` to include memories with non-null scoping fields.
 - **Platform vs OSS imports:** Platform: `from mem0 import MemoryClient`. OSS: `from mem0 import Memory`. Don't mix them — `MemoryClient` talks to `api.mem0.ai`, `Memory` runs locally.
 - **v3 defaults:** `top_k=20`, `threshold=0.1`, `rerank=False`. Adjust as needed.
 
@@ -139,7 +138,7 @@ Mem0 v3 uses single-pass extraction, entity linking, and multi-signal retrieval.
 - **Entity linking:** Replaces graph memory. Auto-extracted during `add()`, no config needed. Remove `enable_graph` and `graph_store` from any old config.
 - **Defaults:** `top_k=20`, `threshold=0.1`, `rerank=False`
 - **Removed params:** `org_id`, `project_id`, `enable_graph` — all removed from SDK
-- **TypeScript:** Exclusively camelCase (`userId`, `agentId`, `appId`, `topK`)
+- **TypeScript:** Exclusively camelCase (`agentId`, `appId`, `topK`)
 - **Add response:** Async — returns event ID immediately, poll via `GET /v1/event/{event_id}/`
 
 See the [migration guide](https://docs.mem0.ai/migration/platform-v2-to-v3) for details.

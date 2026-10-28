@@ -45,17 +45,17 @@ Both read from `MEM0_API_KEY` env var if no key provided.
 
 ```python
 # Python: kwargs
-client.add(messages, user_id="alice", metadata={"source": "chat"})
-client.search("query", filters={"user_id": "alice"}, top_k=5, rerank=True)
+client.add(messages, metadata={"source": "chat"})
+client.search("query", top_k=5, rerank=True)
 ```
 
 ```typescript
 // TypeScript: options object with camelCase for top-level params, snake_case for filter keys
-await client.add(messages, { userId: 'alice', metadata: { source: 'chat' } });
-await client.search('query', { filters: { user_id: 'alice' }, topK: 5, rerank: true });
+await client.add(messages, { metadata: { source: 'chat' } });
+await client.search('query', { topK: 5, rerank: true });
 ```
 
-**v3:** Python uses `snake_case` everywhere. TypeScript uses `camelCase` for top-level params (`userId`, `topK`) but `snake_case` for filter keys (`user_id`, `agent_id`).
+**v3:** Python uses `snake_case` everywhere. TypeScript uses `camelCase` for top-level params (`topK`, `rerank`) but `snake_case` for filter keys (`agent_id`).
 
 ## Architectural Differences
 
@@ -106,24 +106,6 @@ These methods exist in Python but not TypeScript:
 | `agent_id="bot"` | `agentId: 'bot'` |
 | `run_id="session"` | `runId: 'session'` |
 
-## Entity ID Passing (v3)
-
-| Method | Python | TypeScript |
-|--------|--------|------------|
-| add() | Top-level: `user_id="alice"` | Top-level: `{ userId: 'alice' }` |
-| search() | In filters: `filters={"user_id": "alice"}` | In filters: `{ filters: { user_id: 'alice' } }` |
-| get_all() | In filters: `filters={"user_id": "alice"}` | In filters: `{ filters: { user_id: 'alice' } }` |
-
 ## Common Gotcha
 
-When searching/filtering, both Python and TypeScript use `snake_case` for filter keys. TypeScript only uses `camelCase` for top-level method parameters:
-
-```python
-# Python - snake_case in filters
-results = client.search("query", filters={"user_id": "alice"})
-```
-
-```typescript
-// TypeScript - snake_case in filters, camelCase for top-level params
-const results = await client.search('query', { filters: { user_id: 'alice' }, topK: 20 });
-```
+When searching/filtering, both Python and TypeScript use `snake_case` for filter keys. TypeScript only uses `camelCase` for top-level method parameters.

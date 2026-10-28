@@ -36,7 +36,7 @@ client = AsyncMemoryClient(api_key="m0-xxx")
 
 # Or use as context manager
 async with AsyncMemoryClient(api_key="m0-xxx") as client:
-    results = await client.search("query", filters={"user_id": "alice"})
+    results = await client.search("query")
 ```
 
 Same methods as `MemoryClient`, all `async`/`await`. Supports async context manager.
@@ -54,13 +54,12 @@ messages = [
     {"role": "user", "content": "I'm a vegetarian and allergic to nuts."},
     {"role": "assistant", "content": "Got it! I'll remember that."}
 ]
-client.add(messages, user_id="alice")
+client.add(messages)
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `messages` | str \| dict \| list[dict] | required | Message content. Strings auto-convert to user messages |
-| `user_id` | str | None | User identifier |
 | `agent_id` | str | None | Agent identifier |
 | `app_id` | str | None | Application identifier |
 | `run_id` | str | None | Session/run identifier |
@@ -77,7 +76,7 @@ client.add(messages, user_id="alice")
 Search memories by semantic similarity.
 
 ```python
-results = client.search("dietary preferences", filters={"user_id": "alice"})
+results = client.search("dietary preferences")
 for mem in results.get("results", []):
     print(mem["memory"], mem["score"])
 ```
@@ -85,7 +84,7 @@ for mem in results.get("results", []):
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `query` | str | required | Natural language search query |
-| `filters` | dict | None | Filter object with entity IDs and/or `AND`/`OR`/`NOT` conditions (e.g., `{"user_id": "alice"}`) |
+| `filters` | dict | None | Filter object with `AND`/`OR`/`NOT` conditions over label fields |
 | `top_k` | int | 10 | Number of results |
 | `rerank` | bool | False | Enable deep semantic reranking (+150-200ms) |
 | `threshold` | float | 0.1 | Minimum similarity score |
@@ -106,12 +105,10 @@ memory = client.get(memory_id="ea925981-...")
 
 #### get_all(**kwargs)
 
-Retrieve all memories with optional filtering. Requires at least one entity identifier.
+Retrieve all memories with optional filtering. Filters are optional — ownership comes from the API key.
 
 ```python
-memories = client.get_all(filters={"user_id": "alice"})
-# With compound filters
-memories = client.get_all(filters={"AND": [{"user_id": "alice"}, {"categories": {"contains": "health"}}]})
+memories = client.get_all(filters={"categories": {"contains": "health"}})
 ```
 
 | Parameter | Type | Default | Description |
@@ -144,10 +141,11 @@ client.delete("ea925981-...")
 
 #### delete_all(**kwargs)
 
-Delete all memories matching filters. Irreversible.
+Delete all memories matching filters. Irreversible. With no filters it deletes every memory visible to the API key.
 
 ```python
-client.delete_all(user_id="alice")
+client.delete_all()
+client.delete_all(run_id="session-123")  # Narrower: only that session
 ```
 
 #### history(memory_id)
@@ -198,13 +196,9 @@ users = client.users()
 # Returns: {"results": [{"type": "user", "name": "alice"}, ...]}
 ```
 
-#### delete_users(user_id=None, agent_id=None, app_id=None, run_id=None)
+#### delete_users(agent_id=None, app_id=None, run_id=None)
 
 Delete a specific entity and all its memories.
-
-```python
-client.delete_users(user_id="alice")
-```
 
 #### reset()
 
@@ -232,7 +226,7 @@ schema = json.dumps({
         "preferences": {"type": "array", "items": {"type": "string"}},
     }
 })
-export = client.create_memory_export(schema=schema, user_id="alice")
+export = client.create_memory_export(schema=schema)
 ```
 
 #### get_memory_export(**kwargs)
@@ -248,7 +242,7 @@ result = client.get_memory_export(memory_export_id=export["id"])
 Get a summary of memories.
 
 ```python
-summary = client.get_summary(filters={"user_id": "alice"})
+summary = client.get_summary()
 ```
 
 ---
@@ -444,7 +438,6 @@ results = await m.search("query", filters={"user_id": "alice"})
 | **Auth** | API key required (`MEM0_API_KEY`) | No API key -- config-based |
 | **Execution** | API calls to `api.mem0.ai` | Local execution |
 | **Infrastructure** | Fully managed | Self-managed vector DB, embedder, LLM |
-| **Entity filtering** | `filters={"user_id": "..."}` | `filters={"user_id": "..."}` |
 | **Batch ops** | `batch_update`, `batch_delete` | Not available |
 | **Webhooks** | Full CRUD | Not available |
 | **Export** | `create_memory_export`, `get_memory_export` | Not available |
@@ -462,13 +455,6 @@ results = await m.search("query", filters={"user_id": "alice"})
 If you're using SDK v2.x or the v2 API:
 
 **API Changes:**
-- **Entity IDs in search/get_all:** Pass `user_id`, `agent_id` as top-level kwargs instead of inside `filters`
-  ```python
-  # v2
-  results = client.search("query", user_id="alice")
-  # v3
-  results = client.search("query", filters={"user_id": "alice"})
-  ```
 - **add() returns:** v2 returns ADD, UPDATE, DELETE events; v3 returns ADD only
 
 **Default Changes:**

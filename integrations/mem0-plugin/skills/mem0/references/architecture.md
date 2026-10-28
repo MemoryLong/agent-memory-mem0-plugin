@@ -121,16 +121,6 @@ Query In
 | `threshold` | 0.1 | Was None in v2 |
 | `rerank` | False | Was True in v2 |
 
-### Implicit null scoping
-
-When you search with `filters={"user_id": "alice"}` only, Mem0 returns memories where `agent_id`, `app_id`, and `run_id` are all null. This prevents cross-scope leakage by default.
-
-To include memories with non-null fields, use explicit filters:
-```python
-# Gets memories for alice regardless of agent/app/run
-filters={"OR": [{"user_id": "alice"}]}
-```
-
 ---
 
 ## Memory Lifecycle (v3)
@@ -138,7 +128,7 @@ filters={"OR": [{"user_id": "alice"}]}
 v3 uses ADD-only extraction. Memories accumulate over time rather than being consolidated.
 
 ### Creation
-- `client.add(messages, user_id="...")`
+- `client.add(messages)`
 - Single-pass extraction → deduplication → storage
 - Returns `{"event_id": "...", "status": "PENDING"}`
 
@@ -149,7 +139,7 @@ v3 uses ADD-only extraction. Memories accumulate over time rather than being con
 ### Deletion
 - Single: `client.delete(memory_id)`
 - Batch: `client.batch_delete([...])`
-- Bulk: `client.delete_all(filters={"user_id": "alice"})`
+- Bulk: `client.delete_all()` — every memory visible to the API key
 
 ---
 
@@ -182,7 +172,7 @@ v3 uses ADD-only extraction. Memories accumulate over time rather than being con
 |-------|------|-------------|
 | `id` | UUID | Unique identifier, used for update/delete |
 | `memory` | string | Extracted or stored text content |
-| `user_id` | string | Primary entity scope |
+| `user_id` | string | Owner, resolved from the API key (returned, never passed) |
 | `agent_id` | string | Agent scope |
 | `app_id` | string | Application scope |
 | `run_id` | string | Session/run scope |
@@ -197,47 +187,30 @@ v3 uses ADD-only extraction. Memories accumulate over time rather than being con
 
 ## Scoping & Multi-Tenancy
 
-Mem0 separates memories across four dimensions to prevent data mixing:
+Mem0 separates memories across three dimensions to prevent data mixing. Ownership is not one of them: it comes from the API key.
 
 | Dimension | Field | Purpose | Example |
 |-----------|-------|---------|---------|
-| User | `user_id` | Persistent persona or account | `"customer_6412"` |
 | Agent | `agent_id` | Distinct agent or tool | `"meal_planner"` |
 | App | `app_id` | Product surface or deployment | `"ios_retail_app"` |
 | Session | `run_id` | Short-lived flow or thread | `"ticket-9241"` |
 
 ### Storage model
 
-Each entity combination creates separate records. A memory with `user_id="alice"` is stored separately from one with `user_id="alice"` + `agent_id="bot"`.
-
-### Critical: cross-entity queries
-
-```python
-# This returns NOTHING — user and agent memories are stored separately
-filters={"AND": [{"user_id": "alice"}, {"agent_id": "bot"}]}
-
-# Use OR to query multiple scopes
-filters={"OR": [{"user_id": "alice"}, {"agent_id": "bot"}]}
-
-# Use wildcard to include any non-null value
-filters={"AND": [{"user_id": "*"}]}  # All users (excludes null)
-```
+Each entity combination creates separate records.
 
 ### Recommended scoping patterns
 
 ```python
-# User-level: persistent preferences
-client.add(messages, user_id="alice")
-
 # Session-level: temporary context
-client.add(messages, user_id="alice", run_id="session_123")
+client.add(messages, run_id="session_123")
 # Clean up when done: client.delete_all(run_id="session_123")
 
 # Agent-level: agent-specific knowledge
 client.add(messages, agent_id="support_bot", app_id="helpdesk")
 
 # Multi-tenant: full isolation
-client.add(messages, user_id="alice", agent_id="bot", app_id="acme_corp", run_id="ticket_42")
+client.add(messages, agent_id="bot", app_id="acme_corp", run_id="ticket_42")
 ```
 
 ---
@@ -263,20 +236,18 @@ Mem0 supports three layers of memory, from shortest to longest lived:
 - Long-lived knowledge tied to a person or account
 - Personal preferences, account state, compliance details
 - **Lifetime:** Weeks to forever
-- **Managed by:** Mem0 via `user_id` parameter
+- **Managed by:** Mem0 via the API key (no parameter)
 - Persists across all sessions and interactions
 
 ### How layering works in practice
 
 ```python
-def chat(user_input: str, user_id: str, session_id: str) -> str:
+def chat(user_input: str, session_id: str) -> str:
     # 1. Retrieve user memories (long-term preferences)
-    user_mems = mem0.search(user_input, filters={"user_id": user_id})
+    user_mems = mem0.search(user_input)
 
     # 2. Retrieve session memories (current task context)
-    session_mems = mem0.search(user_input, filters={
-        "AND": [{"user_id": user_id}, {"run_id": session_id}]
-    })
+    session_mems = mem0.search(user_input, filters={"run_id": session_id})
 
     # 3. Combine both layers for LLM context
     context = format_memories(user_mems) + format_memories(session_mems)
@@ -284,9 +255,9 @@ def chat(user_input: str, user_id: str, session_id: str) -> str:
     # 4. Generate response
     response = llm.generate(context=context, input=user_input)
 
-    # 5. Store in session scope (temporary) + user scope (persistent)
+    # 5. Store in session scope (temporary)
     messages = [{"role": "user", "content": user_input}, {"role": "assistant", "content": response}]
-    mem0.add(messages, user_id=user_id, run_id=session_id)
+    mem0.add(messages, run_id=session_id)
 
     return response
 ```
@@ -311,7 +282,6 @@ def chat(user_input: str, user_id: str, session_id: str) -> str:
 
 ### Scoping strategy for performance
 
-- Use `user_id` for all user-facing queries (most common, fastest)
 - Add `run_id` for session isolation (narrows search space)
 - Avoid wildcard `"*"` filters on large datasets (scans all non-null records)
 - Use `top_k` to limit result count when you only need a few memories

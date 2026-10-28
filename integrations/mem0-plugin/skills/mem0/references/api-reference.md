@@ -14,7 +14,7 @@ All endpoints require: `Authorization: Token <MEM0_API_KEY>`
 | Get Single Memory | `GET` | `/v1/memories/{memory_id}/` |
 | Update Memory | `PUT` | `/v1/memories/{memory_id}/` |
 | Delete Memory | `DELETE` | `/v1/memories/{memory_id}/` |
-| Delete All Memories | `DELETE` | `/v1/memories/?user_id=X&app_id=Y` |
+| Delete All Memories | `DELETE` | `/v1/memories/?app_id=Y` |
 | Get Event Status | `GET` | `/v1/event/{event_id}/` |
 
 ## Memory Object Structure
@@ -23,7 +23,7 @@ All endpoints require: `Authorization: Token <MEM0_API_KEY>`
 |-------|------|-------------|
 | `id` | string (UUID) | Unique memory identifier |
 | `memory` | string | Text content of the memory |
-| `user_id` | string | Associated user |
+| `user_id` | string | Owner, resolved from the API key (returned, never passed) |
 | `agent_id` | string (nullable) | Agent identifier |
 | `app_id` | string (nullable) | Application identifier |
 | `run_id` | string (nullable) | Run/session identifier |
@@ -37,16 +37,13 @@ Search results additionally include `score` (relevance metric).
 
 ## Scoping Identifiers
 
-Memories can be scoped to different levels:
+Memories can be scoped to different levels. Ownership (the user) is not chosen by the caller -- it is derived from the API key, so `user_id` is returned on memories but never passed in.
 
 | Scope | Parameter | Use Case |
 |-------|-----------|----------|
-| User | `user_id` | Per-user memory isolation |
 | Agent | `agent_id` | Per-agent memory partitioning |
 | Application | `app_id` | Cross-agent app-level memory |
 | Run/Session | `run_id` | Session-scoped temporary memory |
-
-**Critical:** Combining `user_id` and `agent_id` in a single AND filter yields empty results. Entities are stored separately. Use `OR` logic or separate queries.
 
 ## Processing Model
 
@@ -61,14 +58,13 @@ Filters use nested JSON with a logical operator at the root:
 ```json
 {
     "AND": [
-        {"user_id": "alice"},
         {"categories": {"contains": "finance"}},
         {"created_at": {"gte": "2024-01-01"}}
     ]
 }
 ```
 
-Root must be `AND`, `OR`, or `NOT`. Simple shorthand `{"user_id": "alice"}` also works.
+Root must be `AND`, `OR`, or `NOT`. Simple shorthand `{"categories": {"contains": "finance"}}` also works.
 
 ### Supported Operators
 
@@ -87,21 +83,22 @@ Root must be `AND`, `OR`, or `NOT`. Simple shorthand `{"user_id": "alice"}` also
 
 | Field | Valid Operators |
 |-------|-----------------|
-| `user_id`, `agent_id`, `app_id`, `run_id` | `eq`, `ne`, `in`, `*` |
+| `agent_id`, `app_id`, `run_id` | `eq`, `ne`, `in`, `*` |
 | `created_at`, `updated_at`, `timestamp` | `gt`, `gte`, `lt`, `lte`, `eq`, `ne` |
 | `categories` | `eq`, `ne`, `in`, `contains` |
 | `metadata` | `eq`, `ne`, `contains` (top-level keys only) |
 | `keywords` | `contains`, `icontains` |
 | `memory_ids` | `in` |
 
+`user_id` and `env` are not filter dimensions: ownership comes from the API key. `env` is always refused; `user_id` is refused unless it names the key's own user.
+
 ### Filter Constraints
 
-1. **Entity scope partitioning:** `user_id` AND `agent_id` in one `AND` block yields empty results.
-2. **Metadata limitations:** Only top-level keys. Only `eq`, `contains`, `ne`. No `in` or `gt`.
-3. **Operator syntax:** Use `gte`, `lt`, `ne`. SQL-style (`>=`, `!=`) rejected.
-4. **Entity filter required for get-all:** At least one of `user_id`, `agent_id`, `app_id`, or `run_id`.
-5. **Wildcard excludes null:** `*` matches only non-null values.
-6. **Date format:** ISO 8601 (`YYYY-MM-DDTHH:MM:SSZ`). Timezone-naive defaults to UTC.
+1. **Metadata limitations:** Only top-level keys. Only `eq`, `contains`, `ne`. No `in` or `gt`.
+2. **Operator syntax:** Use `gte`, `lt`, `ne`. SQL-style (`>=`, `!=`) rejected.
+3. **get-all needs no entity filter:** Ownership comes from the API key. Add `agent_id`, `app_id`, or `run_id` to narrow.
+4. **Wildcard excludes null:** `*` matches only non-null values.
+5. **Date format:** ISO 8601 (`YYYY-MM-DDTHH:MM:SSZ`). Timezone-naive defaults to UTC.
 
 ## Response Formats
 
