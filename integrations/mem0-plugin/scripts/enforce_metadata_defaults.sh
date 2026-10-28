@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # PreToolUse hook for mem0 MCP tools.
-# Injects identity (user_id, app_id) and metadata defaults when the agent
-# omits them. Uses the hookSpecificOutput.updatedInput contract to modify
-# tool call parameters before execution.
+# Injects app_id and metadata defaults when the agent omits them. Uses the
+# hookSpecificOutput.updatedInput contract to modify tool call parameters
+# before execution. user_id is never injected: the backend derives it from the
+# X-API-Key.
 #
 # Handles:
-#   add_memory         — top-level user_id, app_id, metadata defaults
-#   search_memories    — user_id/app_id into filters.AND[]
-#   get_memories       — user_id/app_id into filters.AND[]
-#   delete_all_memories — top-level user_id, app_id
+#   add_memory         — top-level app_id, metadata defaults
+#   search_memories    — app_id into filters.AND[]
+#   get_memories       — app_id into filters.AND[]
+#   delete_all_memories — top-level app_id
 #
 # Hook contract:
 #   exit 0 = allow. If stdout contains {"hookSpecificOutput": {"updatedInput": ...}},
@@ -43,7 +44,6 @@ TOOL_INPUT=$(echo "$INPUT" | jq -r '.tool_input // "{}"' 2>/dev/null)
 _PATCH_OUT="/tmp/mem0_enforce_$$"
 trap 'rm -f "$_PATCH_OUT"' EXIT
 _MEM0_TOOL_INPUT="$TOOL_INPUT" \
-_MEM0_USER_ID="${MEM0_RESOLVED_USER_ID:-}" \
 _MEM0_APP_ID="${MEM0_PROJECT_ID:-}" \
 _MEM0_GLOBAL_SEARCH="${MEM0_GLOBAL_SEARCH:-false}" \
 _MEM0_HANDLER="$HANDLER" \
@@ -57,28 +57,64 @@ except Exception:
     sys.exit(0)
 
 handler = os.environ.get("_MEM0_HANDLER", "")
-resolved_uid = os.environ.get("_MEM0_USER_ID", "")
 resolved_aid = os.environ.get("_MEM0_APP_ID", "")
 global_search = os.environ.get("_MEM0_GLOBAL_SEARCH", "false") == "true"
 changed = False
 
 
-def inject_top_level_identity(inp, uid, aid):
-    """Inject user_id/app_id as top-level params (for add_memory, delete_all)."""
+def drop_user_id(node):
+    """Remove user_id at any depth. Returns (clean_node, dropped).
+
+    The account calling the LLM is a dedicated agent-memory account, not the
+    end user whose memories are stored, so the model must never narrow by
+    user_id — the backend resolves the owner from the X-API-Key. Drop the key
+    wherever the caller put it (top level, filters.AND[], ...).
+    """
+    if isinstance(node, dict):
+        dropped = "user_id" in node
+        clean = {}
+        for key, value in node.items():
+            if key == "user_id":
+                continue
+            clean_value, sub_dropped = drop_user_id(value)
+            # Every clause was identity-only: an empty AND/OR would be a
+            # degenerate filter, so drop the group instead of leaving [].
+            if sub_dropped and value and not clean_value:
+                dropped = True
+                continue
+            clean[key] = clean_value
+            dropped = dropped or sub_dropped
+        return clean, dropped
+    if isinstance(node, list):
+        dropped = False
+        items = []
+        for item in node:
+            clean_item, sub_dropped = drop_user_id(item)
+            dropped = dropped or sub_dropped
+            # An identity-only clause would become {} — drop it instead.
+            if isinstance(item, dict) and sub_dropped and not clean_item:
+                continue
+            items.append(clean_item)
+        return items, dropped
+    return node, False
+
+
+inp, user_id_dropped = drop_user_id(inp)
+
+
+def inject_top_level_identity(inp, aid):
+    """Inject app_id as a top-level param (for add_memory, delete_all)."""
     changed = False
-    if uid and not inp.get("user_id"):
-        inp["user_id"] = uid
-        changed = True
     if aid and not inp.get("app_id"):
         inp["app_id"] = aid
         changed = True
     return changed
 
 
-def inject_filter_identity(inp, uid, aid):
-    """Inject user_id/app_id into filters.AND[] (for search/get_memories)."""
+def inject_filter_identity(inp, aid):
+    """Inject app_id into filters.AND[] (for search/get_memories)."""
     changed = False
-    if not uid and not aid:
+    if not aid:
         return False
 
     filters = inp.get("filters")
@@ -86,8 +122,6 @@ def inject_filter_identity(inp, uid, aid):
     if filters is None:
         # No filters at all — create from scratch
         and_clauses = []
-        if uid:
-            and_clauses.append({"user_id": uid})
         if aid:
             and_clauses.append({"app_id": aid})
         inp["filters"] = {"AND": and_clauses}
@@ -96,21 +130,17 @@ def inject_filter_identity(inp, uid, aid):
     if not isinstance(filters, dict):
         return False
 
-    # Check if filters already contain user_id/app_id
+    # Check if filters already contain app_id
     and_clauses = filters.get("AND")
     if and_clauses is None:
-        # Filters exist but no AND — could be flat like {"user_id": "x"}
-        has_uid = "user_id" in filters
+        # Filters exist but no AND — could be flat like {"app_id": "x"}
         has_aid = "app_id" in filters
-        if has_uid and has_aid:
+        if has_aid:
             return False
-        # Convert flat filters to AND format and add missing identity
+        # Convert flat filters to AND format and add the project label
         existing = []
         for k, v in list(filters.items()):
             existing.append({k: v})
-        if uid and not has_uid:
-            existing.append({"user_id": uid})
-            changed = True
         if aid and not has_aid:
             existing.append({"app_id": aid})
             changed = True
@@ -121,13 +151,9 @@ def inject_filter_identity(inp, uid, aid):
     if not isinstance(and_clauses, list):
         return False
 
-    # AND array exists — check for existing user_id/app_id
-    has_uid = any("user_id" in c for c in and_clauses if isinstance(c, dict))
+    # AND array exists — check for existing app_id
     has_aid = any("app_id" in c for c in and_clauses if isinstance(c, dict))
 
-    if uid and not has_uid:
-        and_clauses.append({"user_id": uid})
-        changed = True
     if aid and not has_aid:
         and_clauses.append({"app_id": aid})
         changed = True
@@ -136,7 +162,7 @@ def inject_filter_identity(inp, uid, aid):
 
 
 if handler == "add_memory":
-    changed = inject_top_level_identity(inp, resolved_uid, resolved_aid)
+    changed = inject_top_level_identity(inp, resolved_aid)
 
     meta = inp.get("metadata") or {}
 
@@ -179,16 +205,14 @@ if handler == "add_memory":
         inp["metadata"] = meta
 
 elif handler in ("search_memories", "get_memories"):
-    if global_search:
-        inp["filters"] = {"OR": [{"user_id": "*"}]}
-        changed = True
-    else:
-        changed = inject_filter_identity(inp, resolved_uid, resolved_aid)
+    # A global search reads across projects, so it gets no app_id narrowing.
+    if not global_search:
+        changed = inject_filter_identity(inp, resolved_aid)
 
 elif handler == "delete_all":
-    changed = inject_top_level_identity(inp, resolved_uid, resolved_aid)
+    changed = inject_top_level_identity(inp, resolved_aid)
 
-if changed:
+if changed or user_id_dropped:
     print(json.dumps(inp))
 PYEOF
 PATCHED=$(cat "$_PATCH_OUT" 2>/dev/null)

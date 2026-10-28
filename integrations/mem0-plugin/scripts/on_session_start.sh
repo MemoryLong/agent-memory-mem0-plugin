@@ -29,7 +29,6 @@ export MEM0_SESSION_ID
 # Persist identity to Claude's env so Bash tool calls, MCP config, and other hooks see them
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   echo "export MEM0_SESSION_ID=\"$MEM0_SESSION_ID\"" >> "$CLAUDE_ENV_FILE"
-  echo "export MEM0_RESOLVED_USER_ID=\"${MEM0_RESOLVED_USER_ID:-${USER:-default}}\"" >> "$CLAUDE_ENV_FILE"
   echo "export MEM0_PROJECT_ID=\"${MEM0_PROJECT_ID:-unknown}\"" >> "$CLAUDE_ENV_FILE"
   echo "export MEM0_BRANCH=\"${MEM0_BRANCH:-unknown}\"" >> "$CLAUDE_ENV_FILE"
   if [ -n "${MEM0_API_KEY:-}" ]; then
@@ -40,18 +39,17 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
 fi
 
 if [ -z "${MEM0_API_KEY:-}" ]; then
-  _UID="${MEM0_RESOLVED_USER_ID:-${USER:-default}}"
   _PID="${MEM0_PROJECT_ID:-unknown}"
   _BR="${MEM0_BRANCH:-unknown}"
   cat <<BANNER
 ## Mem0 — Setup Required
 
-\`user=${_UID} | project=${_PID} | branch=${_BR} | auth=none\`
+\`project=${_PID} | branch=${_BR} | auth=none\`
 
 IMPORTANT: In your FIRST response, display this exact status line as your opening line:
 
 \`\`\`
-Mem0 — Setup Required | user=${_UID} | project=${_PID} | branch=${_BR} | auth=none
+Mem0 — Setup Required | project=${_PID} | branch=${_BR} | auth=none
 \`\`\`
 
 MEM0_API_KEY is not set. To configure:
@@ -102,29 +100,27 @@ except Exception:
 " 2>/dev/null || echo "?")
 fi
 
-_UID="${MEM0_RESOLVED_USER_ID:-${USER:-default}}"
-_ANN="${_MEM0_IDENTITY_ANNOTATION:-}"
 _PID="${MEM0_PROJECT_ID:-unknown}"
 _BR="${MEM0_BRANCH:-unknown}"
 _GS="${MEM0_GLOBAL_SEARCH:-false}"
 
 if [ "$_GS" = "true" ]; then
   _SCOPE_LABEL="scope=global"
-  _SCOPE_INSTR="Global search is ON — searches return all memories across all users and projects."
+  _SCOPE_INSTR="Global search is ON — searches return memories across all projects."
 else
   _SCOPE_LABEL="project=${_PID}"
-  _SCOPE_INSTR="Identity (user/app) is resolved automatically from your API key — no need to pass user_id or app_id."
+  _SCOPE_INSTR="Searches are scoped to this project automatically — never pass user_id; identity comes from your API key."
 fi
 
 cat <<BANNER
 ## Mem0 Active
 
-\`user=${_UID}${_ANN} | ${_SCOPE_LABEL} | branch=${_BR} | memories=${MEM0_COUNT}\`
+\`${_SCOPE_LABEL} | branch=${_BR} | memories=${MEM0_COUNT}\`
 
 IMPORTANT: In your FIRST response, display this exact status line as your opening line:
 
 \`\`\`
-Mem0 Active | user=${_UID}${_ANN} | ${_SCOPE_LABEL} | branch=${_BR} | memories=${MEM0_COUNT}
+Mem0 Active | ${_SCOPE_LABEL} | branch=${_BR} | memories=${MEM0_COUNT}
 \`\`\`
 
 ${_SCOPE_INSTR}

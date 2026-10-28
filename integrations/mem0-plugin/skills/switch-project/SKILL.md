@@ -1,6 +1,6 @@
 ---
 name: switch-project
-description: Overrides the auto-detected project scope to read and write memories under a different project ID, or enables global search to access all memories across all users and projects. Use when working across multiple projects, accessing memories from another repo, enabling team-wide memory access, or when auto-detection resolves to the wrong project.
+description: Overrides the auto-detected project scope to read and write memories under a different project ID, or enables global search to access all memories across all projects. Use when working across multiple projects, accessing memories from another repo, enabling team-wide memory access, or when auto-detection resolves to the wrong project.
 ---
 
 # Mem0 Switch Project
@@ -10,7 +10,7 @@ Override the automatic project_id detection for the current directory, or enable
 ## Usage
 
 - `/mem0:switch-project <project-name>` — switch to a specific project scope
-- `/mem0:switch-project --global` — enable global search (all memories, all users, all projects)
+- `/mem0:switch-project --global` — enable global search (all memories, all projects)
 - `/mem0:switch-project --no-global` — disable global search and return to per-project scoping
 
 ## Execution
@@ -37,8 +37,8 @@ Override the automatic project_id detection for the current directory, or enable
 2. Print:
    ```
    Global search enabled.
-   Searches now return all memories across all users and projects.
-   Writes still use the current user_id and app_id.
+   Searches now return all memories across all projects.
+   Writes still use the current app_id.
    Restart the session for the change to take effect.
    ```
 
@@ -93,7 +93,7 @@ Override the automatic project_id detection for the current directory, or enable
    (Replace `<PROJECT_NAME>` with the user's chosen project name.)
 
 3. Verify by searching for existing memories:
-   - Call `search_memories` with `query="project"`, `filters={"AND": [{"user_id": "<active_user_id>"}, {"app_id": "<PROJECT_NAME>"}]}`, `top_k=1`
+   - Call `search_memories` with `query="project"`, `filters={"AND": [{"app_id": "<PROJECT_NAME>"}]}`, `top_k=1`
 
 4. Print:
    ```

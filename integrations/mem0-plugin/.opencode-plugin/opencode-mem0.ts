@@ -5,7 +5,6 @@
 import type {Plugin} from "@opencode-ai/plugin";
 import {tool} from "@opencode-ai/plugin";
 import {MemoryClient} from "mem0ai";
-import {userInfo} from "os";
 import {basename, resolve, dirname} from "path";
 import {randomBytes} from "crypto";
 import {existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync} from "fs";
@@ -27,14 +26,10 @@ import {asScope, scopeSearchFilters, scopeWriteParams, resolveDefaultScope, SCOP
 import {parseProjectFromRemote} from "./project";
 import {resolveApiKey} from "./api-key";
 
-async function getUserId(): Promise<string> {
-  if (process.env.MEM0_USER_ID) return process.env.MEM0_USER_ID;
-  try {
-    return userInfo().username;
-  } catch {
-  }
-  return process.env.USER || process.env.USERNAME || "unknown";
-}
+// Identity is NOT resolved here: this plugin is a direct-connect client, so the
+// backend derives user_id (and the rest of the isolation dimension) from the
+// X-API-Key on every request. The plugin only contributes labels (app_id,
+// branch, session metadata) and must never pass a user_id of its own.
 
 async function getProjectId($: any): Promise<string> {
   if (process.env.MEM0_APP_ID) return process.env.MEM0_APP_ID;
@@ -183,15 +178,46 @@ const ERROR_STRONG_RE =
 const ERROR_MULTI_RE = /(Error:|Exception:)/g;
 const WRITE_TOOLS = new Set(["Write", "Edit", "MultiEdit", "write", "edit", "multiEdit"]);
 
-function resolveFilters(args: any, globalSearch: boolean, userId: string, appId: string): any {
-  if (args.filters) {
-    const existingFilters = args.filters;
+// Drop user_id wherever the caller put it (top level, AND[] / OR[] clauses).
+// The account calling the LLM is a dedicated agent-memory account, not the end
+// user whose memories are stored, so narrowing by user_id is never correct —
+// the backend resolves the owner from the API key.
+function stripUserId(node: any): any {
+  if (Array.isArray(node)) {
+    return node
+      .map(stripUserId)
+      // A clause that held only user_id is now empty — drop it, don't send {}.
+      .filter((item, i) => !(isEmptyGroup(item) && !isEmptyGroup(node[i])));
+  }
+  if (node && typeof node === "object") {
+    const out: any = {};
+    for (const [key, value] of Object.entries(node)) {
+      if (key === "user_id") continue;
+      const stripped = stripUserId(value);
+      // Same for a group left with no clauses: an empty AND/OR is degenerate.
+      if (isEmptyGroup(stripped) && !isEmptyGroup(value)) continue;
+      out[key] = stripped;
+    }
+    return out;
+  }
+  return node;
+}
+
+function isEmptyGroup(value: any): boolean {
+  if (Array.isArray(value)) return value.length === 0;
+  return value !== null && typeof value === "object" && Object.keys(value).length === 0;
+}
+
+// Narrow the caller-supplied filters to this project. Only labels are added:
+// identity (user_id) is the backend's, resolved from the API key, so it is never
+// part of a filter we build or forward.
+function resolveFilters(args: any, appId: string): any {
+  const filters = stripUserId(args.filters);
+  if (filters) {
+    const existingFilters = filters;
     if (typeof existingFilters === "object" && existingFilters !== null) {
       const andClauses: any[] = existingFilters.AND;
       if (Array.isArray(andClauses)) {
-        const hasUid = andClauses.some(
-          (c: any) => c && typeof c === "object" && "user_id" in c,
-        );
         const hasAid = andClauses.some(
           (c: any) => c && typeof c === "object" && "app_id" in c,
         );
@@ -199,36 +225,23 @@ function resolveFilters(args: any, globalSearch: boolean, userId: string, appId:
           (c: any) => c && typeof c === "object" && "agent_id" in c,
         );
         const newClauses = [...andClauses];
-        if (args.agent_id || hasAgentId) {
-          if (!hasAgentId) newClauses.push({ agent_id: args.agent_id });
-        } else {
-          if (!hasUid) newClauses.push({ user_id: args.user_id ?? userId });
-        }
+        if (args.agent_id && !hasAgentId) newClauses.push({ agent_id: args.agent_id });
         if (!hasAid) newClauses.push({ app_id: args.app_id ?? appId });
         return { AND: newClauses };
       } else if (andClauses === undefined) {
-        const hasUid = "user_id" in existingFilters;
         const hasAid = "app_id" in existingFilters;
         const hasAgentId = "agent_id" in existingFilters;
-        if (!hasAid || (!hasUid && !hasAgentId)) {
+        if (!hasAid || !hasAgentId) {
           const existing = Object.entries(existingFilters).map(
             ([k, v]) => ({ [k]: v }),
           );
-          if (args.agent_id || hasAgentId) {
-            if (!hasAgentId) existing.push({ agent_id: args.agent_id });
-          } else {
-            if (!hasUid) existing.push({ user_id: args.user_id ?? userId });
-          }
+          if (args.agent_id && !hasAgentId) existing.push({ agent_id: args.agent_id });
           if (!hasAid) existing.push({ app_id: args.app_id ?? appId });
           return { AND: existing };
         }
       }
     }
-    return args.filters;
-  }
-
-  if (globalSearch) {
-    return { OR: [{ user_id: "*" }] };
+    return filters;
   }
 
   if (args.agent_id) {
@@ -237,9 +250,7 @@ function resolveFilters(args: any, globalSearch: boolean, userId: string, appId:
     };
   }
 
-  return {
-    AND: [{ user_id: args.user_id ?? userId }, { app_id: args.app_id ?? appId }],
-  };
+  return { AND: [{ app_id: args.app_id ?? appId }] };
 }
 
 function extractUserText(input: any, output: any): string {
@@ -277,12 +288,13 @@ const Mem0Plugin: Plugin = async (ctx) => {
   }
 
   const mem0 = new MemoryClient({apiKey});
-  const userId = await getUserId();
-  const appId = await getProjectId($);
-  const branch = await getBranch($);
+  const [appId, branch] = await Promise.all([getProjectId($), getBranch($)]);
   const stats = {adds: 0, searches: 0, messages: 0};
   const sessionId = generateSessionId();
   const globalSearch = loadGlobalSearch();
+  // Every internal read uses this: global reads span projects, everything else
+  // is narrowed to this project's app_id label.
+  const readFilters = globalSearch ? {} : {AND: [{app_id: appId}]};
 
   let initialized = false;
   let memoryCount = 0;
@@ -351,8 +363,8 @@ const Mem0Plugin: Plugin = async (ctx) => {
 
 Use the mem0 memory tools (add_memory, search_memories, get_memories, get_memory, update_memory, delete_memory, delete_all_memories, delete_entities, list_entities, get_event_status) as instructed by the skill.
 
-Identity context (resolved at plugin startup):
-- user_id: ${userId}
+Label context (resolved at plugin startup). Identity is NOT here — the backend
+derives user_id from the API key:
 - app_id: ${appId}
 - session_id: ${sessionId}
 - branch: ${branch}`,
@@ -366,12 +378,12 @@ Identity context (resolved at plugin startup):
   // user's persisted default scope (read fresh so /mem0-scope applies at once).
   // A "project" default preserves the existing behavior, including global_search.
   function readScopeFilters(args: any): any {
-    if (args.scope) return scopeSearchFilters(asScope(args.scope), userId, appId, sessionId);
-    if (args.filters || args.agent_id) return resolveFilters(args, globalSearch, userId, appId);
+    if (args.scope) return scopeSearchFilters(asScope(args.scope), appId, sessionId);
+    if (args.filters || args.agent_id) return resolveFilters(args, appId);
     const ds = loadDefaultScope();
     return ds === "project"
-      ? resolveFilters(args, globalSearch, userId, appId)
-      : scopeSearchFilters(ds, userId, appId, sessionId);
+      ? resolveFilters(args, appId)
+      : scopeSearchFilters(ds, appId, sessionId);
   }
 
   return {
@@ -386,7 +398,6 @@ Identity context (resolved at plugin startup):
       output: { env: Record<string, string> },
     ) => {
       if (output?.env) {
-        output.env.MEM0_USER_ID = userId;
         output.env.MEM0_APP_ID = appId;
         output.env.MEM0_SESSION_ID = sessionId;
         output.env.MEM0_BRANCH = branch;
@@ -419,7 +430,6 @@ Identity context (resolved at plugin startup):
         description: "Add a new memory. This method is called everytime the user informs anything about themselves, their preferences, or anything that has any relevant information which can be useful in the future conversation. This can also be called when the user asks you to remember something. Set infer to false to store the memory verbatim without LLM fact extraction.",
         args: {
           text: tool.schema.string().describe("Memory text content"),
-          user_id: tool.schema.string().optional().describe("User ID"),
           app_id: tool.schema.string().optional().describe("App/Project ID"),
           agent_id: tool.schema.string().optional().describe("Agent ID"),
           metadata: tool.schema.record(tool.schema.string(), tool.schema.any()).optional().describe("Metadata key-value pairs"),
@@ -431,8 +441,7 @@ Identity context (resolved at plugin startup):
           if (dreamTriggered) dreamWriteSeen = true;
           captureEvent("tool_use", {tool: "add_memory"}, apiKey, appId);
           const effScope: Scope = args.scope ? asScope(args.scope) : loadDefaultScope();
-          const sp = scopeWriteParams(effScope, userId, appId, sessionId);
-          const finalUserId = args.agent_id ? args.user_id : (args.user_id ?? sp.user_id);
+          const sp = scopeWriteParams(effScope, appId, sessionId);
           const finalAppId = args.app_id ?? sp.app_id;
 
           const meta = args.metadata ?? {};
@@ -451,7 +460,6 @@ Identity context (resolved at plugin startup):
           const res = await mem0.add(
             [{ role: "user", content: args.text }],
             {
-              user_id: finalUserId,
               app_id: finalAppId,
               run_id: sp.run_id,
               agent_id: args.agent_id,
@@ -467,10 +475,9 @@ Identity context (resolved at plugin startup):
         description: "Search stored memories by semantic meaning. Use this proactively before answering when the request may depend on the user's past work, preferences, decisions, or environment -- relevant memories are not always auto-injected. For multi-part or comparative questions, run several searches with different phrasings and combine the results rather than stopping after one (multi-hop).",
         args: {
           query: tool.schema.string().describe("Search query"),
-          user_id: tool.schema.string().optional().describe("User ID"),
           app_id: tool.schema.string().optional().describe("App/Project ID"),
           agent_id: tool.schema.string().optional().describe("Agent ID"),
-          filters: tool.schema.record(tool.schema.string(), tool.schema.any()).optional().describe("Key-value filters (e.g. metadata or user/app filters)"),
+          filters: tool.schema.record(tool.schema.string(), tool.schema.any()).optional().describe("Key-value filters (labels such as type, branch, app_id — never user_id)"),
           limit: tool.schema.number().optional().describe("Maximum number of results to return (top_k)"),
           top_k: tool.schema.number().optional().describe("Maximum number of results to return (alternative parameter)"),
           scope: tool.schema.string().optional().describe('Search scope: "project" (this repo, default), "session" (this run only), or "global" (across ALL your projects). Only use "global" when the user explicitly asks to search across projects.'),
@@ -492,10 +499,9 @@ Identity context (resolved at plugin startup):
       get_memories: tool({
         description: "List or browse stored memories without a search query -- useful for auditing what is remembered or paging through everything in a scope. To find memories relevant to a question, use search_memories instead (it ranks by semantic relevance).",
         args: {
-          user_id: tool.schema.string().optional().describe("User ID"),
           app_id: tool.schema.string().optional().describe("App/Project ID"),
           agent_id: tool.schema.string().optional().describe("Agent ID"),
-          filters: tool.schema.record(tool.schema.string(), tool.schema.any()).optional().describe("Metadata/identity filters"),
+          filters: tool.schema.record(tool.schema.string(), tool.schema.any()).optional().describe("Metadata/label filters"),
           page: tool.schema.number().optional().describe("Page number"),
           page_size: tool.schema.number().optional().describe("Page size"),
           scope: tool.schema.string().optional().describe('Scope: "project" (default), "session", or "global" (across ALL your projects). Use "global" only when explicitly asked.'),
@@ -558,7 +564,6 @@ Identity context (resolved at plugin startup):
       delete_all_memories: tool({
         description: "Delete ALL memories in the given scope. Destructive and irreversible -- only use when the user explicitly asks to wipe their memory. Never call speculatively.",
         args: {
-          user_id: tool.schema.string().optional().describe("User ID whose memories to delete"),
           app_id: tool.schema.string().optional().describe("App ID whose memories to delete"),
           agent_id: tool.schema.string().optional().describe("Agent ID whose memories to delete"),
           scope: tool.schema.string().optional().describe('Scope to delete: "project" (default), "session", or "global" (user-wide). Use "global" only when explicitly asked.'),
@@ -566,9 +571,8 @@ Identity context (resolved at plugin startup):
         async execute(args) {
           if (dreamTriggered) dreamWriteSeen = true;
           captureEvent("tool_use", {tool: "delete_all_memories"}, apiKey, appId);
-          const sp = args.scope ? scopeWriteParams(asScope(args.scope), userId, appId, sessionId) : null;
+          const sp = args.scope ? scopeWriteParams(asScope(args.scope), appId, sessionId) : null;
           const res = await mem0.deleteAll({
-            user_id: sp ? sp.user_id : (args.agent_id ? args.user_id : (args.user_id ?? userId)),
             app_id: sp ? sp.app_id : (args.app_id ?? appId),
             run_id: sp?.run_id,
             agent_id: args.agent_id,
@@ -580,7 +584,6 @@ Identity context (resolved at plugin startup):
       delete_entities: tool({
         description: "Delete entire user/agent/app/run entities and every memory attached to them. Destructive and irreversible -- only on explicit user request to remove a whole user, agent, or project.",
         args: {
-          user_id: tool.schema.string().optional().describe("User ID of the entity to delete"),
           agent_id: tool.schema.string().optional().describe("Agent ID of the entity to delete"),
           app_id: tool.schema.string().optional().describe("App/Project ID of the entity to delete"),
           run_id: tool.schema.string().optional().describe("Run ID of the entity to delete"),
@@ -588,7 +591,6 @@ Identity context (resolved at plugin startup):
         async execute(args) {
           captureEvent("tool_use", {tool: "delete_entities"}, apiKey, appId);
           const res = await mem0.deleteUsers({
-            userId: args.user_id,
             agentId: args.agent_id,
             appId: args.app_id,
             runId: args.run_id,
@@ -642,9 +644,7 @@ Identity context (resolved at plugin startup):
         incrementSessionCount(mem0StateDir, sessionId);
       }
 
-      const searchFilters = globalSearch
-        ? {OR: [{user_id: "*"}]}
-        : {AND: [{user_id: userId}, {app_id: appId}]};
+      const searchFilters = readFilters;
 
       try {
         const all = await mem0.getAll({
@@ -664,11 +664,11 @@ Identity context (resolved at plugin startup):
 
         if (globalSearch) {
           systemContext.push(
-            `Global search is ON — searches return all memories across all users and projects. Writes still use user_id="${userId}", app_id="${appId}".`,
+            `Global search is ON — searches are not narrowed to a project. Writes still carry app_id="${appId}".`,
           );
         } else {
           systemContext.push(
-            `Always include user_id="${userId}" and app_id="${appId}" in every search_memories filter and add_memory call.`,
+            `Reads and writes carry app_id="${appId}" automatically. Never pass user_id — identity is resolved by the backend from the API key.`,
           );
         }
 
@@ -703,7 +703,7 @@ Identity context (resolved at plugin startup):
         }
 
         systemContext.push(
-          "Mem0 searches apply when user references past work, decision questions, errors, or non-trivial tasks. Queries use noun-phrases, 2-4 parallel calls with different metadata.type filters, and include user_id + app_id.",
+          "Mem0 searches apply when user references past work, decision questions, errors, or non-trivial tasks. Queries use noun-phrases, 2-4 parallel calls with different metadata.type filters, and never carry a user_id — identity comes from the API key.",
         );
         systemContext.push(SCOPE_GUIDANCE);
         const activeScope = loadDefaultScope();
@@ -761,14 +761,7 @@ Identity context (resolved at plugin startup):
     const hasResume = RESUME_RE.test(safeText);
     if (hasResume) {
       try {
-        const resumeFilters = globalSearch
-          ? {OR: [{user_id: "*"}]}
-          : {
-            AND: [
-              {user_id: userId},
-              {app_id: appId},
-            ],
-          };
+        const resumeFilters = readFilters;
         const [stateRes, decisionsRes] = await Promise.all([
           mem0.search("session state current task", {
             filters: resumeFilters,
@@ -802,9 +795,7 @@ Identity context (resolved at plugin startup):
 
     if (!hasResume && memoryCount > 0) {
       try {
-        const msgFilters = globalSearch
-          ? {OR: [{user_id: "*"}]}
-          : {AND: [{user_id: userId}, {app_id: appId}]};
+        const msgFilters = readFilters;
         const res = await mem0.search(safeText, {
           filters: msgFilters,
           topK: 5,
@@ -823,7 +814,6 @@ Identity context (resolved at plugin startup):
       Promise.resolve().then(async () => {
         try {
           await mem0.add([{role: "user", content: safeText}], {
-            user_id: userId,
             app_id: appId,
             metadata: {
               type: "auto_capture",
@@ -920,14 +910,7 @@ Identity context (resolved at plugin startup):
 
         captureEvent("bash_error", {error_detected: true}, apiKey, appId);
 
-        const errorFilters = globalSearch
-          ? {OR: [{user_id: "*"}]}
-          : {
-            AND: [
-              {user_id: userId},
-              {app_id: appId},
-            ],
-          };
+        const errorFilters = readFilters;
         const res = await mem0.search(`error: ${errorQuery}`, {
           filters: errorFilters,
           topK: 6,
@@ -964,7 +947,6 @@ Identity context (resolved at plugin startup):
       Promise.resolve().then(async () => {
         try {
           await mem0.add([{role: "user", content: summaryContent}], {
-            user_id: userId,
             app_id: appId,
             metadata: {
               type: "session_state",
@@ -978,9 +960,7 @@ Identity context (resolved at plugin startup):
         }
       });
 
-      const compactFilters = globalSearch
-        ? {OR: [{user_id: "*"}]}
-        : {AND: [{user_id: userId}, {app_id: appId}]};
+      const compactFilters = readFilters;
       const res = await mem0.search("session state decisions learnings", {
         filters: compactFilters,
         topK: 10,

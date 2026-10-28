@@ -83,7 +83,7 @@ The MCP server authenticates using the `MEM0_API_KEY` set in Step 1. No OAuth or
 
 **STOP here** — do not proceed without MCP tools.
 
-## Step 3: Verify connectivity and show identity
+## Step 3: Verify connectivity and show project context
 
 Call `search_memories` with `query="project setup"`, `top_k=1` to verify connectivity.
 

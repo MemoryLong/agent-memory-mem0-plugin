@@ -22,10 +22,10 @@ Pre-fetches relevant memories to prime context before working on a task.
 
    | Query angle | Filter | Purpose |
    |---|---|---|
-   | Feature/module name | `{"AND": [{"user_id": "<id>"}, {"app_id": "<pid>"}, {"metadata": {"type": "decision"}}]}` | Architecture decisions |
-   | File paths mentioned | `{"AND": [{"user_id": "<id>"}, {"app_id": "<pid>"}, {"metadata": {"type": "convention"}}]}` | Coding patterns |
-   | Error keywords (if any) | `{"AND": [{"user_id": "<id>"}, {"app_id": "<pid>"}, {"metadata": {"type": "anti_pattern"}}]}` | Known pitfalls |
-   | Broad project context | `{"AND": [{"user_id": "<id>"}, {"app_id": "<pid>"}]}` | Catch-all |
+   | Feature/module name | `{"AND": [{"app_id": "<pid>"}, {"metadata": {"type": "decision"}}]}` | Architecture decisions |
+   | File paths mentioned | `{"AND": [{"app_id": "<pid>"}, {"metadata": {"type": "convention"}}]}` | Coding patterns |
+   | Error keywords (if any) | `{"AND": [{"app_id": "<pid>"}, {"metadata": {"type": "anti_pattern"}}]}` | Known pitfalls |
+   | Broad project context | `{"AND": [{"app_id": "<pid>"}]}` | Catch-all |
 
 3. **Deduplicate** results by memory ID across all search responses.
 

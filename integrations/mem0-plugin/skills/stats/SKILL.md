@@ -27,7 +27,7 @@ If the script returns empty or errors, note "No session data available" and cont
 **Lifetime stats:**
 Call `get_memories` to fetch all memories for this project:
 
-`filters={"AND": [{"user_id": "<active_user_id>"}, {"app_id": "<active_project_id>"}]}`, `page_size=100`
+`filters={"AND": [{"app_id": "<active_project_id>"}]}`, `page_size=100`
 
 Group by:
 1. `categories[0]` (platform-assigned) — primary grouping
@@ -43,7 +43,7 @@ memories are stored without `run_id` and metadata filters on `session_id` are in
 
 The local stats file tracks adds and searches for the current session accurately.
 
-Also run a `search_memories` MCP tool call with `query="project"`, `filters={"AND": [{"user_id": "<active_user_id>"}, {"app_id": "<active_project_id>"}]}`, `top_k=1` to measure round-trip latency. Note the time before and after the MCP call — do NOT attempt raw HTTP calls to the API.
+Also run a `search_memories` MCP tool call with `query="project"`, `filters={"AND": [{"app_id": "<active_project_id>"}]}`, `top_k=1` to measure round-trip latency. Note the time before and after the MCP call — do NOT attempt raw HTTP calls to the API.
 
 ### Step 3: Display
 
@@ -68,7 +68,7 @@ Print a minimal dashboard. No ASCII bar charts — use a clean table layout:
 **Age** — oldest: 2026-02-15, newest: 2026-05-23
   < 7 days: 5 · 7–30d: 12 · 30–90d: 10 · > 90d: 8
 
-**Identity** — user: kartik · project: my-project · branch: main
+**Context** — project: my-project · branch: main
 ```
 
 **Display rules:**
@@ -86,7 +86,7 @@ activity digest after the standard stats dashboard:
 ### W1: Fetch recent memories
 
 Call `search_memories` in parallel with time-scoped queries:
-1. `query="decisions made this week"`, `filters={"AND": [{"user_id": "<id>"}, {"app_id": "<pid>"}, {"created_at": {"gte": "<7 days ago YYYY-MM-DD>"}}]}`, `top_k=20`
+1. `query="decisions made this week"`, `filters={"AND": [{"app_id": "<pid>"}, {"created_at": {"gte": "<7 days ago YYYY-MM-DD>"}}]}`, `top_k=20`
 2. `query="bugs errors fixes"`, same time filter, `top_k=20`
 3. `query="patterns conventions learnings"`, same time filter, `top_k=20`
 

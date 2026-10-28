@@ -17,7 +17,7 @@ The user provides either a search query or memory ID.
 - Call `get_memory` with the ID.
 
 **If search query:**
-- Call `search_memories` with the query, `filters={"AND": [{"user_id": "<id>"}, {"app_id": "<pid>"}]}`, `top_k=5`.
+- Call `search_memories` with the query, `filters={"AND": [{"app_id": "<pid>"}]}`, `top_k=5`.
 - Show numbered list with content previews.
 - Ask: "Which memory to pin? Enter a number."
 
@@ -40,7 +40,6 @@ update_memory(id=<selected_id>, text=pinned_text)
 **For new memories** (user wants to pin text that isn't stored yet):
 1. Call `add_memory` with:
    - `text="[PINNED] <the user's text>"`
-   - `user_id=<active_user_id>`
    - `app_id=<active_project_id>`
    - `metadata={"pinned": true, "type": "decision", "confidence": 1.0}`
    - `infer=False`

@@ -21,12 +21,11 @@ _KEY="${MEM0_API_KEY:-}"
 - If `NOT_SET`: FAIL — "No API key configured"
 - If set: PASS — the command already prints only the first 6 chars
 
-### Check 2: Identity resolution
+### Check 2: Project context
 
-Resolve identity from the `MEM0_*` environment variables set by the plugin's `shell.env` hook. These are the exact values the plugin uses to scope memories, so report them directly. Do NOT re-run `git` here: the plugin already resolved branch and project from git at session start, and re-shelling git can disagree with it — e.g. it prints an empty branch that renders as `(not a git repo)` while the Session check below shows `branch=main`. One source of truth keeps the two lines consistent.
+Resolve project context from the `MEM0_*` environment variables set by the plugin's `shell.env` hook. These are the exact values the plugin uses to scope memories, so report them directly. Do NOT re-run `git` here: the plugin already resolved branch and project from git at session start, and re-shelling git can disagree with it — e.g. it prints an empty branch that renders as `(not a git repo)` while the Session check below shows `branch=main`. One source of truth keeps the two lines consistent.
 
 ```bash
-echo "user_id=${MEM0_USER_ID:-${USER:-default}}"
 echo "project_id=${MEM0_APP_ID:-}"
 echo "branch=${MEM0_BRANCH:-main}"
 _S="$HOME/.mem0/settings.json"
@@ -34,18 +33,17 @@ _SCOPE="$(grep -o '"default_scope"[[:space:]]*:[[:space:]]*"[a-z]*"' "$_S" 2>/de
 echo "default_scope=${_SCOPE:-project}"
 ```
 
-- `user_id`: from `MEM0_USER_ID`, falling back to `$USER`
 - `project_id`: from `MEM0_APP_ID`
 - `branch`: from `MEM0_BRANCH` (the plugin's resolved value; falls back to `main` outside a git repo)
 - `default_scope`: from `~/.mem0/settings.json` (`default_scope`), falling back to `project`. This is the scope memory tools use when none is given; change it with `/mem0-scope`.
 
-PASS if `user_id` and `project_id` are non-empty. WARN if `project_id` is empty — the `shell.env` hook may not have fired (restart OpenCode). Report the branch verbatim from `MEM0_BRANCH`; never invent a string like `(not a git repo)`.
+PASS if `project_id` is non-empty. WARN if `project_id` is empty — the `shell.env` hook may not have fired (restart OpenCode). Report the branch verbatim from `MEM0_BRANCH`; never invent a string like `(not a git repo)`.
 
 ### Check 3: Memory tool connectivity
 
 Call `search_memories` with:
 - `query="health check"`
-- `filters={"AND": [{"user_id": "<active_user_id>"}, {"app_id": "<active_project_id>"}]}`
+- `filters={"AND": [{"app_id": "<active_project_id>"}]}`
 - `top_k=1`
 
 - If returns successfully (even empty): PASS
@@ -55,7 +53,6 @@ Call `search_memories` with:
 
 Call `add_memory` with:
 - `text="Health check probe — safe to delete."`
-- `user_id=<active_user_id>`
 - `app_id=<active_project_id>`
 - `metadata={"type": "health_check", "probe": true}`
 - `infer=False`
@@ -115,7 +112,7 @@ Report:
 ## mem0 status
 
 PASS  API Key         m0-dVe...
-PASS  Identity        user=kartik, project=mem0, branch=main
+PASS  Context         project=mem0, branch=main
 PASS  Default scope   project
 PASS  Memory Tools    142ms
 PASS  Write/Read      write + delete OK
@@ -135,7 +132,7 @@ When invoked with `--deep` (e.g., `/mem0-status --deep`), run the standard 6 che
 
 ### Quality Check 1: Duplicates
 
-Call `get_memories` with `filters={"AND": [{"user_id": "<active_user_id>"}, {"app_id": "<active_project_id>"}]}`, `page_size=200`. Compare all pairs within the same `metadata.type` group for high textual overlap (shared nouns/keywords > 60%). Report:
+Call `get_memories` with `filters={"AND": [{"app_id": "<active_project_id>"}]}`, `page_size=200`. Compare all pairs within the same `metadata.type` group for high textual overlap (shared nouns/keywords > 60%). Report:
 
 ```
 Potential duplicates: <N> pairs

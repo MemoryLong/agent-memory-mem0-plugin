@@ -9,16 +9,15 @@ Export all memories for the current project to a portable Markdown file.
 
 ## Execution
 
-### Step 1: Resolve identity
+### Step 1: Resolve project context
 
-Determine the active identity:
-- `user_id` from `MEM0_USER_ID` env var, else `$USER`, else `"default"`
+Determine the active project:
 - `project_id` (used as `app_id`) from `MEM0_PROJECT_ID` env var, or via the project resolver
 
 ### Step 2: Fetch all memories
 
 Call `get_memories` with:
-- `filters={"AND": [{"user_id": "<active_user_id>"}, {"app_id": "<active_project_id>"}]}`
+- `filters={"AND": [{"app_id": "<active_project_id>"}]}`
 - `page_size=200`
 
 If the response is paginated (i.e. the result contains a `next` cursor or the count equals `page_size`), continue fetching pages until all memories are retrieved.

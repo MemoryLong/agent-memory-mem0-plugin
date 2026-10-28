@@ -42,7 +42,7 @@ Call `get_memories` to retrieve every memory for the active project:
 
 ```python
 get_memories(
-    filters={"AND": [{"user_id": "<active_user_id>"}, {"app_id": "<active_project_id>"}]},
+    filters={"AND": [{"app_id": "<active_project_id>"}]},
     page_size=200,
 )
 ```
@@ -161,7 +161,6 @@ For each approved merge pair:
 2. `delete_memory(<id2>)`
 3. `add_memory` with:
    - `text="<merged content>"`
-   - `user_id=<active_user_id>`
    - `app_id=<active_project_id>` (top-level, not in metadata)
    - `metadata={"type": "<original type>", "branch": "<active_branch>", "confidence": <higher of the two original scores>, "source": "mem0-dream"}`
    - `infer=False`
@@ -214,13 +213,12 @@ In auto mode:
    [mem0-dream --auto] project=<id>  merged=<N>  pruned=<N>  conflicts_skipped=<N>
    ```
 4. If contradictions were detected but skipped, check if a `mem0-dream-auto` reminder already exists before storing one:
-   - Search for existing reminders: `search_memories(query="mem0-dream contradictions manual review", filters={"AND": [{"user_id": "<active_user_id>"}, {"app_id": "<active_project_id>"}, {"metadata": {"source": "mem0-dream-auto"}}]}, top_k=1)`
+   - Search for existing reminders: `search_memories(query="mem0-dream contradictions manual review", filters={"AND": [{"app_id": "<active_project_id>"}, {"metadata": {"source": "mem0-dream-auto"}}]}, top_k=1)`
    - If a result exists with similarity > 0.9, skip storing the reminder (one already exists).
    - If no match, store the reminder:
    ```python
    add_memory(
        text="mem0-dream detected <N> contradiction(s) requiring manual review. Run /mem0-dream to resolve them interactively.",
-       user_id="<active_user_id>",
        app_id="<active_project_id>",
        metadata={"type": "task_learning", "source": "mem0-dream-auto", "branch": "<active_branch>"},
        infer=False,

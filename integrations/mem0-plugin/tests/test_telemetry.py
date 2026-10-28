@@ -46,7 +46,6 @@ def test_enabled_by_default(monkeypatch):
 def test_posthog_payload_structure(monkeypatch):
     import telemetry
 
-    monkeypatch.setenv("MEM0_RESOLVED_USER_ID", "testuser")
     monkeypatch.setenv("MEM0_PROJECT_ID", "test-project")
     monkeypatch.delenv("MEM0_API_KEY", raising=False)
     monkeypatch.delenv("CLAUDE_PLUGIN_OPTION_MEM0_API_KEY", raising=False)
@@ -71,7 +70,6 @@ def test_system_props_override_caller_props(monkeypatch):
     """H8: system properties must win over caller-supplied properties."""
     import telemetry
 
-    monkeypatch.setenv("MEM0_RESOLVED_USER_ID", "testuser")
     monkeypatch.setenv("MEM0_PROJECT_ID", "test-project")
     monkeypatch.delenv("MEM0_API_KEY", raising=False)
     monkeypatch.delenv("CLAUDE_PLUGIN_OPTION_MEM0_API_KEY", raising=False)
@@ -109,8 +107,7 @@ def test_distinct_id_fallback_no_key(monkeypatch):
 
     monkeypatch.delenv("MEM0_API_KEY", raising=False)
     monkeypatch.delenv("CLAUDE_PLUGIN_OPTION_MEM0_API_KEY", raising=False)
-    monkeypatch.setenv("MEM0_RESOLVED_USER_ID", "kartik")
-    assert telemetry._distinct_id() == telemetry._sha256("kartik")
+    assert telemetry._distinct_id() == "anonymous"
 
 
 def test_hash_deterministic():

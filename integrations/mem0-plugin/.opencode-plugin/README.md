@@ -44,7 +44,7 @@ Pure TypeScript — no Python, no shell scripts. Memory operations are native Op
 | **Post-tool** | `tool.execute.after` | Scans bash errors and pre-fetches related memories |
 | **Messages transform** | `experimental.chat.messages.transform` | Injects memory context (session memories, search results, error lookups) into the prompt |
 | **Compaction** | `experimental.session.compacting` | Stores session state memory, then injects prior memories into compaction context so nothing is lost |
-| **Shell env** | `shell.env` | Exports `MEM0_USER_ID`, `MEM0_APP_ID`, `MEM0_SESSION_ID`, and `MEM0_BRANCH` to shell |
+| **Shell env** | `shell.env` | Exports `MEM0_APP_ID`, `MEM0_SESSION_ID`, and `MEM0_BRANCH` to shell (never a user id — the backend derives it from the API key) |
 
 ## Memory Tools
 
@@ -67,8 +67,8 @@ scope (used when none is passed) with the `/mem0-scope` skill:
 
 | Scope | Reads | Writes |
 |-------|-------|--------|
-| `project` (default) | this repo (`user_id` + `app_id`) | this repo |
-| `session` | this run (adds `run_id`) | this run |
+| `project` (default) | this repo (`app_id`) | this repo |
+| `session` | this run (`app_id` + `run_id`) | this run |
 | `global` | all your projects (`app_id="*"`) | user-wide (drops `app_id`) |
 
 ```

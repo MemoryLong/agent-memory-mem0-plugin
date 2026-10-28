@@ -61,12 +61,16 @@ def _sha256(value: str) -> str:
 
 
 def _distinct_id() -> str:
-    """Stable anonymous ID: SHA-256 of API key if available, else SHA-256 of username."""
+    """Stable anonymous ID: SHA-256 of API key if available, else a constant.
+
+    The API key is an installation identifier, not a person. When there is no
+    key at all (misconfiguration path) a constant keeps events aggregatable
+    without deriving anything from the OS user.
+    """
     api_key = os.environ.get("MEM0_API_KEY") or os.environ.get("CLAUDE_PLUGIN_OPTION_MEM0_API_KEY") or ""
     if api_key:
         return hashlib.sha256(api_key.encode()).hexdigest()[:32]
-    user_id = os.environ.get("MEM0_RESOLVED_USER_ID") or os.environ.get("USER") or "unknown"
-    return _sha256(user_id)
+    return "anonymous"
 
 
 def detect_platform() -> str:

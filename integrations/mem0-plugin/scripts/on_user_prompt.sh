@@ -177,7 +177,7 @@ if [ -n "$HAS_REMEMBER" ]; then
 fi
 
 if [ -z "$RUBRIC_ALREADY_SHOWN" ]; then
-  _PROMPT_CTX="${_PROMPT_CTX:+${_PROMPT_CTX}\n}Mem0 searches apply when user references past work, decision questions, errors, or non-trivial tasks. Queries use noun-phrases, 2-4 parallel calls with different metadata.type filters, and include user_id + app_id. For multi-part or comparative questions, run follow-up searches and combine results before answering -- one search is rarely enough."
+  _PROMPT_CTX="${_PROMPT_CTX:+${_PROMPT_CTX}\n}Mem0 searches apply when user references past work, decision questions, errors, or non-trivial tasks. Queries use noun-phrases, 2-4 parallel calls with different metadata.type filters, and never carry a user_id -- identity is resolved by the backend from the API key. For multi-part or comparative questions, run follow-up searches and combine results before answering -- one search is rarely enough."
   touch "$RUBRIC_FLAG" 2>/dev/null || true
 fi
 

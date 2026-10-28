@@ -1,25 +1,24 @@
 ---
 name: list-projects
-description: Lists all projects with stored memories for the current user, showing memory counts and last activity dates. Use when checking which projects have memories, comparing memory distribution across repos, or finding a specific project scope.
+description: Lists all projects with stored memories, showing memory counts and last activity dates. Use when checking which projects have memories, comparing memory distribution across repos, or finding a specific project scope.
 ---
 
 # Mem0 List Projects
 
-Show all known project scopes for the current user.
+Show all known project scopes.
 
 ## Execution
 
 ### Step 1: Fetch memories to discover app_ids
 
 There is no dedicated "list projects" API endpoint. Discover projects by fetching
-the user's memories across all scopes.
+memories across all scopes.
 
-**Important:** A filter with only `user_id` triggers implicit null scoping — it
-excludes memories that have a non-null `app_id`. Run two queries and merge:
+Run two queries and merge:
 
-1. **Null-scoped:** `get_memories` with `filters={"AND": [{"user_id": "<active_user_id>"}]}`, `page_size=200`
-   — catches memories without `app_id`
-2. **App-scoped:** `get_memories` with `filters={"AND": [{"user_id": "<active_user_id>"}, {"app_id": {"exists": true}}]}`, `page_size=200`
+1. **Current scope:** `get_memories` with `page_size=200` and no filters
+   — the hook scopes it to the current project
+2. **App-scoped:** `get_memories` with `filters={"AND": [{"app_id": {"exists": true}}]}`, `page_size=200`
    — catches memories with any `app_id`
 
 Run both calls in parallel. Merge results, deduplicate by memory `id`.

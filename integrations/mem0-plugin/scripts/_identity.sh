@@ -1,4 +1,4 @@
-# Source this file. Sets MEM0_API_KEY, MEM0_RESOLVED_USER_ID, and settings.
+# Source this file. Sets MEM0_API_KEY and settings.
 #
 # API key resolution (first non-empty wins):
 #   1. MEM0_API_KEY env var (explicit / shell profile)
@@ -58,22 +58,8 @@ fi
 MEM0_MCP_URL="${MEM0_MCP_URL:-http://localhost:18100/v1/agent/mcp/memory/mcp}"
 export MEM0_MCP_URL
 
-_mem0_resolve_identity() {
-  if [ -n "${MEM0_USER_ID:-}" ]; then
-    printf '%s' "$MEM0_USER_ID"
-    return
-  fi
-  printf '%s' "${USER:-default}"
-}
-
-MEM0_RESOLVED_USER_ID="$(_mem0_resolve_identity)"
-export MEM0_RESOLVED_USER_ID
-
-_MEM0_IDENTITY_ANNOTATION=""
-if [ -n "${MEM0_USER_ID:-}" ] && [ "$MEM0_USER_ID" != "${USER:-default}" ]; then
-  _MEM0_IDENTITY_ANNOTATION=" (override; default: ${USER:-default})"
-fi
-export _MEM0_IDENTITY_ANNOTATION
+# No client-side user identity: the backend derives user_id from the X-API-Key,
+# so there is nothing here to resolve or export.
 
 # Load settings from ~/.mem0/settings.json
 if command -v python3 >/dev/null 2>&1; then

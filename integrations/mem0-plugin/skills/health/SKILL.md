@@ -21,30 +21,30 @@ _KEY="${MEM0_API_KEY:-${CLAUDE_PLUGIN_OPTION_MEM0_API_KEY:-}}"
 - If `NOT_SET`: FAIL — "No API key configured"
 - If set: PASS — the command already prints only the first 6 chars
 
-### Check 2: Identity resolution
+### Check 2: Project context
 
-Resolve identity using the plugin's own resolver scripts to match what hooks use:
+Resolve project context using the plugin's own resolver scripts to match what hooks use:
 
 ```bash
 SCRIPT_DIR="${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CURSOR_PLUGIN_ROOT:-}}}/scripts"
 source "$SCRIPT_DIR/_identity.sh" 2>/dev/null
-echo "user_id=${MEM0_RESOLVED_USER_ID:-}"
 echo "project_id=${MEM0_PROJECT_ID:-}"
 echo "branch=${MEM0_BRANCH:-}"
 ```
 
+`user_id` is not resolved here — the backend derives it from `X-API-Key`.
+
 If `CLAUDE_PLUGIN_ROOT` is not available, fall back to:
-- `user_id`: from `MEM0_USER_ID` or `$USER`
 - `project_id`: from `MEM0_PROJECT_ID` or check `~/.mem0/project_map.json` for `$PWD`
 - `branch`: from `git branch --show-current`
 
-PASS if all three are non-empty. WARN if any falls back to defaults.
+PASS if both are non-empty. WARN if any falls back to defaults.
 
 ### Check 3: MCP server connectivity
 
 Call `search_memories` with:
 - `query="health check"`
-- `filters={"AND": [{"user_id": "<active_user_id>"}, {"app_id": "<active_project_id>"}]}`
+- `filters={"AND": [{"app_id": "<active_project_id>"}]}`
 - `top_k=1`
 
 - If returns successfully (even empty): PASS
@@ -54,7 +54,6 @@ Call `search_memories` with:
 
 Call `add_memory` with:
 - `text="Health check probe — safe to delete."`
-- `user_id=<active_user_id>`
 - `app_id=<active_project_id>`
 - `metadata={"type": "health_check", "probe": true}`
 - `infer=False`
@@ -86,7 +85,7 @@ This file is created by the SessionStart hook and updated by PostToolUse hooks t
 ## mem0 health
 
 PASS  API Key          m0-dVe...
-PASS  Identity         user=kartik, project=mem0, branch=main
+PASS  Context          project=mem0, branch=main
 PASS  MCP Connection   142ms
 PASS  Write/Read       write + delete OK
 PASS  Session Tracker  stats file active
@@ -102,7 +101,7 @@ When invoked with `--deep` (e.g., `/mem0:health --deep`), run the standard 5 che
 
 ### Quality Check 1: Duplicates
 
-Call `get_memories` with `filters={"AND": [{"user_id": "<active_user_id>"}, {"app_id": "<active_project_id>"}]}`, `page_size=200`. Compare all pairs within the same `metadata.type` group for high textual overlap (shared nouns/keywords > 60%). Report:
+Call `get_memories` with `filters={"AND": [{"app_id": "<active_project_id>"}]}`, `page_size=200`. Compare all pairs within the same `metadata.type` group for high textual overlap (shared nouns/keywords > 60%). Report:
 
 ```
 Potential duplicates: <N> pairs

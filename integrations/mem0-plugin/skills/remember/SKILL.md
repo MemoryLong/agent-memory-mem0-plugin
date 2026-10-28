@@ -33,7 +33,6 @@ Based on the content, pick the best `metadata.type`:
 
 Call `add_memory` with:
 - `text="<the user's text>"`
-- `user_id=<active_user_id>`
 - `app_id=<active_project_id>`
 - `metadata={"type": "<classified_type>", "branch": "<active_branch>", "confidence": 1.0, "source": "remember_command"}`
 - `infer=False`

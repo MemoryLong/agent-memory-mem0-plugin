@@ -27,7 +27,6 @@ def _run_hook(prompt: str, env_overrides: dict | None = None, session_id: str = 
         **os.environ,
         "USER": "testuser",
         "MEM0_API_KEY": "test-key-123",
-        "MEM0_RESOLVED_USER_ID": "testuser",
         "MEM0_PROJECT_ID": "test-project",
         "MEM0_BRANCH": "main",
         "MEM0_PREFETCH": "false",

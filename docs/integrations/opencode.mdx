@@ -85,8 +85,8 @@ If you only need the memory tools without the plugin's hooks or skills, point Op
 
 | Scope | Reads | Writes |
 |-------|-------|--------|
-| `project` *(default)* | this repo (`user_id` + `app_id`) | this repo |
-| `session` | this run only (`+ run_id`) | this run |
+| `project` *(default)* | this repo (`app_id`) | this repo |
+| `session` | this run only (`app_id` + `run_id`) | this run |
 | `global` | **all your projects in the workspace** (`app_id: "*"`) | user-wide |
 
 Ask naturally, for example, *"search my memories across all my projects"*. The agent passes `scope: "global"`. For normal questions it stays scoped to the current project automatically.
@@ -115,7 +115,7 @@ The plugin uses the [mem0ai](https://www.npmjs.com/package/mem0ai) TypeScript SD
 | `tool.execute.after` | **Post-tool** | Scans Bash errors and pre-fetches related error memories |
 | `experimental.chat.messages.transform` | **Messages transform** | Injects memory context (session memories, search results, error lookups) into the prompt |
 | `experimental.session.compacting` | **Compaction** | Stores session state memory, then injects prior memories into compaction context so nothing is lost |
-| `shell.env` | **Shell env** | Exports `MEM0_USER_ID`, `MEM0_APP_ID`, `MEM0_SESSION_ID`, and `MEM0_BRANCH` to all shell executions |
+| `shell.env` | **Shell env** | Exports `MEM0_APP_ID`, `MEM0_SESSION_ID`, and `MEM0_BRANCH` to all shell executions (never a user id — the backend derives it from the API key) |
 
 ## Auto-dream (memory consolidation)
 
