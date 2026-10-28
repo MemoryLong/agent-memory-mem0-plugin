@@ -20,6 +20,7 @@ Get your API key (free): [app.mem0.ai/dashboard/api-keys](https://app.mem0.ai/da
 
 ```bash
 echo 'export MEM0_API_KEY="m0-your-key"' >> ~/.zshrc && source ~/.zshrc
+echo 'export MEM0_BASE_URL="http://localhost:18100"' >> ~/.zshrc && source ~/.zshrc
 ```
 
 Restart OpenCode.
@@ -44,7 +45,7 @@ Pure TypeScript — no Python, no shell scripts. Memory operations are native Op
 | **Post-tool** | `tool.execute.after` | Scans bash errors and pre-fetches related memories |
 | **Messages transform** | `experimental.chat.messages.transform` | Injects memory context (session memories, search results, error lookups) into the prompt |
 | **Compaction** | `experimental.session.compacting` | Stores session state memory, then injects prior memories into compaction context so nothing is lost |
-| **Shell env** | `shell.env` | Exports `MEM0_APP_ID`, `MEM0_SESSION_ID`, and `MEM0_BRANCH` to shell (never a user id — the backend derives it from the API key) |
+| **Shell env** | `shell.env` | Exports `MEM0_APP_ID`, `MEM0_SESSION_ID`, `MEM0_BRANCH`, and `MEM0_BASE_URL` to shell (never a user id — the backend derives it from the API key) |
 
 ## Memory Tools
 

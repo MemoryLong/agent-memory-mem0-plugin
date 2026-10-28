@@ -62,44 +62,43 @@ global_search = os.environ.get("_MEM0_GLOBAL_SEARCH", "false") == "true"
 changed = False
 
 
+def is_empty_group(value):
+    return isinstance(value, (dict, list)) and not value
+
+
 def drop_user_id(node):
-    """Remove user_id at any depth. Returns (clean_node, dropped).
+    """Remove user_id at any depth.
 
     The account calling the LLM is a dedicated agent-memory account, not the
     end user whose memories are stored, so the model must never narrow by
-    user_id — the backend resolves the owner from the X-API-Key. Drop the key
-    wherever the caller put it (top level, filters.AND[], ...).
+    user_id — the backend resolves the owner from the X-API-Key. A group that
+    held nothing but user_id becomes an empty AND/OR clause, so it is dropped
+    as well. Mirrors stripUserId() in .opencode-plugin/opencode-mem0.ts.
     """
     if isinstance(node, dict):
-        dropped = "user_id" in node
         clean = {}
         for key, value in node.items():
             if key == "user_id":
                 continue
-            clean_value, sub_dropped = drop_user_id(value)
-            # Every clause was identity-only: an empty AND/OR would be a
-            # degenerate filter, so drop the group instead of leaving [].
-            if sub_dropped and value and not clean_value:
-                dropped = True
+            stripped = drop_user_id(value)
+            if is_empty_group(stripped) and not is_empty_group(value):
                 continue
-            clean[key] = clean_value
-            dropped = dropped or sub_dropped
-        return clean, dropped
+            clean[key] = stripped
+        return clean
     if isinstance(node, list):
-        dropped = False
         items = []
         for item in node:
-            clean_item, sub_dropped = drop_user_id(item)
-            dropped = dropped or sub_dropped
-            # An identity-only clause would become {} — drop it instead.
-            if isinstance(item, dict) and sub_dropped and not clean_item:
+            stripped = drop_user_id(item)
+            if is_empty_group(stripped) and not is_empty_group(item):
                 continue
-            items.append(clean_item)
-        return items, dropped
-    return node, False
+            items.append(stripped)
+        return items
+    return node
 
 
-inp, user_id_dropped = drop_user_id(inp)
+clean_input = drop_user_id(inp)
+user_id_dropped = clean_input != inp
+inp = clean_input
 
 
 def inject_top_level_identity(inp, aid):

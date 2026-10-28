@@ -106,6 +106,14 @@ function loadGlobalSearch(): boolean {
 }
 
 /**
+ * Backend base URL. The plugin talks to the self-hosted agent-memory backend,
+ * not Mem0 cloud; mirrors scripts/_identity.sh, which reads the same variable.
+ */
+function loadBaseUrl(): string | undefined {
+  return process.env.MEM0_BASE_URL?.trim() || undefined;
+}
+
+/**
  * The user's persisted default memory scope (set via the `mem0-scope` skill).
  * Read fresh so a scope change takes effect on the next memory operation without
  * restarting OpenCode. Defaults to "project".
@@ -287,7 +295,8 @@ const Mem0Plugin: Plugin = async (ctx) => {
     return {};
   }
 
-  const mem0 = new MemoryClient({apiKey});
+  const baseUrl = loadBaseUrl();
+  const mem0 = new MemoryClient({apiKey, ...(baseUrl ? {host: baseUrl} : {})});
   const [appId, branch] = await Promise.all([getProjectId($), getBranch($)]);
   const stats = {adds: 0, searches: 0, messages: 0};
   const sessionId = generateSessionId();
@@ -398,6 +407,7 @@ derives user_id from the API key:
       output: { env: Record<string, string> },
     ) => {
       if (output?.env) {
+        if (baseUrl) output.env.MEM0_BASE_URL = baseUrl;
         output.env.MEM0_APP_ID = appId;
         output.env.MEM0_SESSION_ID = sessionId;
         output.env.MEM0_BRANCH = branch;

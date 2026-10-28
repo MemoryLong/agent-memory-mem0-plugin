@@ -22,6 +22,8 @@ echo 'export MEM0_API_KEY="m0-your-api-key"' >> ~/.bashrc && source ~/.bashrc
 ```
 </CodeGroup>
 
+To use a self-hosted backend, also export `MEM0_BASE_URL` (e.g. `http://localhost:18100`).
+
 ## Installation
 
 ### Option A: Plugin Install (Recommended)
@@ -115,7 +117,7 @@ The plugin uses the [mem0ai](https://www.npmjs.com/package/mem0ai) TypeScript SD
 | `tool.execute.after` | **Post-tool** | Scans Bash errors and pre-fetches related error memories |
 | `experimental.chat.messages.transform` | **Messages transform** | Injects memory context (session memories, search results, error lookups) into the prompt |
 | `experimental.session.compacting` | **Compaction** | Stores session state memory, then injects prior memories into compaction context so nothing is lost |
-| `shell.env` | **Shell env** | Exports `MEM0_APP_ID`, `MEM0_SESSION_ID`, and `MEM0_BRANCH` to all shell executions (never a user id — the backend derives it from the API key) |
+| `shell.env` | **Shell env** | Exports `MEM0_APP_ID`, `MEM0_SESSION_ID`, `MEM0_BRANCH`, and `MEM0_BASE_URL` to all shell executions (never a user id — the backend derives it from the API key) |
 
 ## Auto-dream (memory consolidation)
 
